@@ -1,0 +1,11 @@
+{
+    "name": "eternal-light",
+    "version": "1.2.0",
+    "description": "Bible Display System (PWA)",
+    "main": "app/controller.html",
+    "scripts": {
+        "start": "open app/controller.html"
+    },
+    "author": "Sherzat",
+    "license": "MIT"
+}
