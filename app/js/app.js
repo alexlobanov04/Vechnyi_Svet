@@ -43,18 +43,49 @@ const elements = {
 
 // === INITIALIZATION ===
 function init() {
-    // Check if data is loaded
+    const loadingBar = document.getElementById('loading-bar');
+    const loadingStatus = document.getElementById('loading-status');
+
+    // Track loading progress
     const dbs = getDatabases();
-    if (!dbs.RST || !dbs.NRT || !dbs.KTB) {
+    let loaded = 0;
+    const total = 3;
+
+    const updateProgress = (count) => {
+        if (loadingBar) loadingBar.style.width = `${(count / total) * 100}%`;
+        if (loadingStatus) loadingStatus.textContent = `${count} / ${total} переводов`;
+    };
+
+    // Count loaded translations
+    if (dbs.RST) loaded++;
+    updateProgress(loaded);
+    if (dbs.NRT) loaded++;
+    updateProgress(loaded);
+    if (dbs.KTB) loaded++;
+    updateProgress(loaded);
+
+    // Check if all data is loaded
+    if (loaded < total) {
         const missing = [];
         if (!dbs.RST) missing.push('RST');
         if (!dbs.NRT) missing.push('NRT');
         if (!dbs.KTB) missing.push('KTB');
-        elements.loading.innerHTML = `<div style="color: var(--error);">Ошибка: не загружены ${missing.join(', ')}</div>`;
+
+        if (loadingStatus) {
+            loadingStatus.textContent = `Ошибка: ${missing.join(', ')}`;
+            loadingStatus.style.color = 'var(--error)';
+        }
         return;
     }
 
-    elements.loading.style.display = 'none';
+    // Hide loading overlay with fade
+    setTimeout(() => {
+        elements.loading.style.opacity = '0';
+        elements.loading.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => {
+            elements.loading.style.display = 'none';
+        }, 300);
+    }, 200);
 
     // Load saved settings into UI
     const settings = loadSettings();

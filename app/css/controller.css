@@ -630,6 +630,29 @@ body::before {
     color: var(--text-tertiary);
 }
 
+/* Loading Progress Bar */
+.loading-progress {
+    width: 200px;
+    height: 6px;
+    background: var(--glass-border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.loading-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #8b5cf6);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.loading-status {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-top: -8px;
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 1024px) {
     .app {
