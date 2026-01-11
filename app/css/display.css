@@ -1,0 +1,100 @@
+/**
+ * Eternal Light - Display Screen Styles
+ * Projector/second screen display styles
+ */
+
+@import './variables.css';
+
+/* Display-specific variables */
+:root {
+    --bg-deep: #0a0a0c;
+    --font-main: 'Playfair Display', serif;
+    --font-scale: 1;
+    --accent-color: #d4af37;
+    --sub-text-color: rgba(255, 255, 255, 0.5);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-deep);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Animated background gradient */
+.background-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    z-index: -1;
+    animation: pulse-bg 20s infinite alternate;
+}
+
+@keyframes pulse-bg {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+#display-container {
+    max-width: 85%;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    filter: blur(10px);
+}
+
+#display-container.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+}
+
+.verse-text {
+    font-family: var(--font-main);
+    font-size: calc(5vw * var(--font-scale));
+    line-height: 1.25;
+    margin-bottom: 2.5rem;
+    font-weight: 500;
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    letter-spacing: -0.02em;
+    color: var(--text-color, #ffffff);
+    transition: font-family 0.3s, font-size 0.3s;
+}
+
+.verse-reference {
+    font-family: 'Inter', sans-serif;
+    font-size: 2.2vw;
+    font-weight: 400;
+    color: var(--accent-color);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    opacity: 0.9;
+}
+
+/* Idle message */
+.idle-message {
+    font-size: 1.5vw;
+    color: var(--sub-text-color);
+    font-style: italic;
+}
