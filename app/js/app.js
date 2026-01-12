@@ -6,7 +6,7 @@
 import { parseQuery, fetchVerse, fullTextSearch } from './modules/search.js';
 import { showVerse, showNote, hideDisplay, updateDisplaySettings, openDisplayWindow, setDisplayWindow, isDisplayAvailable } from './modules/broadcast.js';
 import { addToHistory, renderHistory, getFromHistory, clearHistory as clearHistoryData } from './modules/history.js';
-import { loadSettings, saveSettings, getEdit, saveEdit, exportEdits, importEdits } from './modules/settings.js';
+import { loadSettings, saveSettings, getEdit, saveEdit } from './modules/settings.js';
 import { updateStatus } from './modules/dom-utils.js';
 
 // === STATE ===
@@ -354,47 +354,7 @@ window.clearHistory = function () {
     renderHistory(elements.historyList, loadFromHistory);
 };
 
-// === EXPORT / IMPORT EDITS ===
 
-window.exportEditsToFile = function () {
-    const data = exportEdits();
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `eternal-light-edits-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    updateStatus(elements.status, '✓ Экспорт завершён', 'success');
-};
-
-window.importEditsFromFile = function () {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-
-    input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const success = importEdits(event.target.result);
-            if (success) {
-                updateStatus(elements.status, '✓ Импорт завершён', 'success');
-            } else {
-                updateStatus(elements.status, '❌ Ошибка импорта', 'error');
-            }
-        };
-        reader.readAsText(file);
-    };
-
-    input.click();
-};
 
 // === REGISTER SERVICE WORKER ===
 if ('serviceWorker' in navigator) {

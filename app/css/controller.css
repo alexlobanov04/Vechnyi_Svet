@@ -768,6 +768,14 @@ body::before {
         transform: translateX(0);
     }
 
+    .sidebar-header {
+        padding-left: 80px;
+        /* Space for hamburger/close button */
+        padding-top: 18px;
+        /* Align vertically with fixed button */
+        padding-bottom: 18px;
+    }
+
     .main {
         padding: 80px 20px 20px 20px;
     }
