@@ -64,6 +64,63 @@ def convert():
             book["BookName"] = correct_name
         else:
             print(f"Warning: No trusted name for Book ID {bid}. Keeping '{original_name}'")
+
+        # Special handling for Psalms (BookId 19) to fix numbering (MT -> LXX)
+        if bid == 19:
+            print("Reprocessing Psalms to match RST/LXX numbering...")
+            new_chapters = {} # { chapter_id: [verses] }
+            
+            # Iterate through all source chapters and redistribute verses
+            for chapter in book.get("Chapters", []):
+                for verse in chapter.get("Verses", []):
+                    text = verse.get("Text", "")
+                    
+                    # Try to parse (Ch:Vs) marker
+                    # Example: "(9:22) Для чего..."
+                    # Example: "(146:1) Аллилуия..."
+                    target_chap_id = chapter.get("ChapterId")
+                    target_verse_id = verse.get("VerseId")
+                    
+                    if text.strip().startswith('('):
+                        try:
+                            # Extract marker
+                            marker_end = text.find(')')
+                            if marker_end != -1:
+                                marker = text[1:marker_end] # "9:22"
+                                if ':' in marker:
+                                    c_str, v_str = marker.split(':')
+                                    target_chap_id = int(c_str)
+                                    # We trust the verse ID in the marker, or keep original?
+                                    # Usually parsing "9:22" means Verse 22
+                                    if v_str.isdigit():
+                                        target_verse_id = int(v_str)
+                                
+                                # Strip the marker from the text
+                                # We remove everything up to the closing parenthesis + space
+                                text = text[marker_end+1:].strip()
+                                verse["Text"] = text
+                        except Exception as e:
+                            print(f"Error parsing marker in '{text[:20]}...': {e}")
+                    
+                    if target_chap_id not in new_chapters:
+                        new_chapters[target_chap_id] = []
+                    
+                    # Update verse object
+                    verse["VerseId"] = target_verse_id
+                    new_chapters[target_chap_id].append(verse)
+            
+            # Reconstruct chapters list sorted by ID
+            reconstructed_chapters = []
+            for cid in sorted(new_chapters.keys()):
+                # Sort verses by ID
+                verses = sorted(new_chapters[cid], key=lambda x: x["VerseId"])
+                reconstructed_chapters.append({
+                    "ChapterId": cid,
+                    "Verses": verses
+                })
+            
+            book["Chapters"] = reconstructed_chapters
+            print(f"Psalms reprocessed: {len(reconstructed_chapters)} chapters.")
             
         processed_books.append(book)
 

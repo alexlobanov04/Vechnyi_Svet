@@ -59,6 +59,17 @@ export function appendChildren(parent, ...children) {
 }
 
 /**
+ * Strip HTML tags from string
+ * @param {string} html
+ * @returns {string}
+ */
+export function stripHtml(html) {
+    const tmp = document.createElement('DIV');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+}
+
+/**
  * Create a history item element safely
  * @param {Object} item - History item data
  * @param {number} index - Item index
@@ -75,9 +86,11 @@ export function createHistoryItem(item, index) {
         textContent: item.reference
     });
 
+    // Strip HTML tags for the snippet to avoid cut-off tags
+    const cleanText = stripHtml(item.text);
     const snippetDiv = createElement('div', {
         className: 'history-snippet',
-        textContent: item.text.substring(0, 40) + '...'
+        textContent: cleanText.substring(0, 40) + '...'
     });
 
     appendChildren(div, refDiv, snippetDiv);

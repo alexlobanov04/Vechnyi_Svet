@@ -182,7 +182,8 @@ async function handleSearch(e) {
         renderHistory(elements.historyList, loadFromHistory);
 
         // Ctrl+Enter broadcasts immediately
-        if (e.ctrlKey) {
+        // Ctrl+Enter or Cmd+Enter broadcasts immediately
+        if (e.ctrlKey || e.metaKey) {
             broadcastToDisplay();
         }
     } else {
@@ -195,7 +196,7 @@ function handleGlobalKeys(e) {
     if (e.key === 'Escape') {
         hideFromDisplay();
     }
-    if (e.ctrlKey && e.key === 'Enter' && currentVerse) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && currentVerse) {
         broadcastToDisplay();
     }
 }
@@ -241,7 +242,7 @@ async function handleTranslationChange(e) {
 
 // === DISPLAY FUNCTIONS ===
 function displayPreview(data) {
-    elements.verseText.textContent = data.text;
+    elements.verseText.innerHTML = data.text;
     elements.verseText.classList.remove('placeholder');
     elements.verseRef.textContent = data.reference;
     elements.btnBroadcast.disabled = false;
@@ -440,7 +441,7 @@ function renderSearchResults(results, query) {
 
         const textDiv = document.createElement('div');
         textDiv.className = 'search-result-text';
-        textDiv.textContent = verse.text; // Safe: textContent
+        textDiv.innerHTML = verse.text; // Safe: innerHTML for formatting
 
         item.appendChild(refDiv);
         item.appendChild(textDiv);

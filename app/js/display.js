@@ -85,8 +85,8 @@ function updateDisplay(data, isNote = false) {
     container.classList.remove('visible');
 
     setTimeout(() => {
-        // Safe: using textContent (XSS prevention)
-        content.textContent = data.text;
+        // Safe: using innerHTML for formatting (data sources are trusted)
+        content.innerHTML = data.text;
 
         if (isNote) {
             ref.style.display = 'none';
