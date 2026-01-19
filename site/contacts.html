@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a0b">
+    <meta name="description" content="Контакты проекта Вечный Свет. Данные для связи будут добавлены позже.">
+    <title>Контакты - Вечный Свет</title>
+    <link rel="icon" href="../app/icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="site.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-grid">
+            <div class="brand">
+                <div class="brand-icon" aria-hidden="true">✦</div>
+                <span class="brand-text">Вечный Свет</span>
+            </div>
+            <nav class="nav" aria-label="Навигация">
+                <a href="index.html#features">Возможности</a>
+                <a href="index.html#how">Как работает</a>
+                <a href="index.html#install">Установка</a>
+                <a href="index.html#shortcuts">Управление</a>
+                <a href="index.html#roadmap">Планы</a>
+                <a href="contacts.html" aria-current="page">Контакты</a>
+            </nav>
+            <div class="nav-actions">
+                <a class="btn btn-ghost" href="../app/controller.html">Открыть пульт</a>
+                <a class="btn btn-primary" href="index.html#install">Установить</a>
+            </div>
+            <button class="nav-toggle" type="button" aria-label="Открыть меню" aria-expanded="false">☰</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="section page-hero">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow">Контакты</span>
+                    <h1>Мы на связи</h1>
+                    <p>
+                        Контактные данные будут добавлены позже. Пока можно написать через форму обратной связи ниже.
+                    </p>
+                </div>
+                <div class="grid contacts-grid">
+                    <div class="card">
+                        <h3>Общие вопросы</h3>
+                        <p>Расскажите о вашей задаче, мы ответим как можно быстрее.</p>
+                        <a class="btn btn-secondary btn-sm" href="#feedback">Оставить сообщение</a>
+                    </div>
+                    <div class="card">
+                        <h3>Техподдержка</h3>
+                        <p>Скоро здесь появится email и мессенджеры для быстрых обращений.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Партнерства</h3>
+                        <p>Напишите о вашей площадке или идее сотрудничества через форму.</p>
+                        <a class="btn btn-ghost btn-sm" href="#feedback">Заполнить форму</a>
+                    </div>
+                    <div class="card">
+                        <h3>Планы развития</h3>
+                        <p>Следите за новыми функциями и темами оформления.</p>
+                        <a class="btn btn-ghost btn-sm" href="index.html#roadmap">Смотреть планы</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="feedback">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-eyebrow">Обратная связь</span>
+                    <h2>Напишите нам</h2>
+                    <p>Идеи, баги, пожелания - все это помогает развивать проект.</p>
+                </div>
+                <div class="grid feedback-grid">
+                    <div class="card form-card">
+                        <form class="form-grid" novalidate>
+                            <div class="form-group">
+                                <label class="form-label" for="name">Имя</label>
+                                <input class="form-input" type="text" id="name" name="name" placeholder="Как к вам обращаться">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="contact">Контакт для ответа</label>
+                                <input class="form-input" type="text" id="contact" name="contact" placeholder="Email, Telegram или телефон">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="topic">Тема</label>
+                                <select class="form-select" id="topic" name="topic">
+                                    <option value="idea">Идея или улучшение</option>
+                                    <option value="bug">Сообщить о проблеме</option>
+                                    <option value="help">Нужна помощь</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="message">Сообщение</label>
+                                <textarea class="form-textarea" id="message" name="message" placeholder="Опишите ситуацию или идею"></textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary" type="button" disabled>Отправить</button>
+                                <span class="form-note">Форма активируется после добавления контактов.</span>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="card">
+                        <h3>Что лучше указать</h3>
+                        <p>Чем подробнее описание, тем быстрее мы сможем помочь.</p>
+                        <ul class="roadmap-items">
+                            <li class="roadmap-item">
+                                <span class="roadmap-dot" aria-hidden="true"></span>
+                                <span>Шаги, как воспроизвести проблему.</span>
+                            </li>
+                            <li class="roadmap-item">
+                                <span class="roadmap-dot" aria-hidden="true"></span>
+                                <span>Скриншот или видео (если есть).</span>
+                            </li>
+                            <li class="roadmap-item">
+                                <span class="roadmap-dot" aria-hidden="true"></span>
+                                <span>Устройство и браузер.</span>
+                            </li>
+                        </ul>
+                        <div class="card-actions">
+                            <a class="btn btn-secondary btn-sm" href="contacts.html">Посмотреть контакты</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-grid">
+            <div class="footer-brand">
+                <div class="brand-icon" aria-hidden="true">✦</div>
+                <div>
+                    <div class="footer-title">Вечный Свет</div>
+                    <div class="footer-sub">Служение через технологии</div>
+                </div>
+            </div>
+            <div class="footer-links">
+                <a href="contacts.html">Контакты</a>
+                <a href="contacts.html#feedback">Обратная связь</a>
+                <a href="../README.md">Документация</a>
+                <a href="../CHANGELOG.md">Обновления</a>
+                <a href="../ROADMAP.md">Планы</a>
+            </div>
+            <div class="footer-meta">
+                <span>MIT License</span>
+                <span>(c) 2026 Eternal Light</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const toggle = document.querySelector('.nav-toggle');
+        const nav = document.querySelector('.nav');
+        const actions = document.querySelector('.nav-actions');
+
+        if (toggle && nav && actions) {
+            const closeMenu = () => {
+                nav.classList.remove('open');
+                actions.classList.remove('open');
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.textContent = '☰';
+            };
+
+            toggle.addEventListener('click', () => {
+                const isOpen = nav.classList.toggle('open');
+                actions.classList.toggle('open', isOpen);
+                toggle.setAttribute('aria-expanded', String(isOpen));
+                toggle.textContent = isOpen ? '✕' : '☰';
+            });
+
+            nav.querySelectorAll('a').forEach((link) => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 900) closeMenu();
+                });
+            });
+
+            actions.querySelectorAll('a').forEach((link) => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 900) closeMenu();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
