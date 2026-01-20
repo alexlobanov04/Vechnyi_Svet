@@ -431,6 +431,9 @@ p {
 
 .card-actions {
     margin-top: 16px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .form-card {
@@ -1041,6 +1044,10 @@ kbd {
         padding: 84px 0 56px;
     }
 
+    .page-hero {
+        padding: 84px 0 56px;
+    }
+
     .hero-grid {
         gap: 28px;
     }
@@ -1120,6 +1127,10 @@ kbd {
         padding: 90px 0 60px;
     }
 
+    .page-hero {
+        padding: 90px 0 60px;
+    }
+
     .hero-actions,
     .cta-actions {
         flex-direction: column;
@@ -1128,6 +1139,16 @@ kbd {
 
     .hero-actions .btn,
     .cta-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .card-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .card-actions .btn {
         width: 100%;
         justify-content: center;
     }
