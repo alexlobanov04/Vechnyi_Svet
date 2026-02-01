@@ -4,7 +4,7 @@
  * v4 - Added display.js module
  */
 
-const CACHE_NAME = 'eternal-light-v9';
+const CACHE_NAME = 'eternal-light-v10';
 
 // Core app files (always cached)
 const CORE_ASSETS = [
