@@ -83,6 +83,7 @@
                     <option value="RST">Синодальный</option>
                     <option value="NRT">НРП</option>
                     <option value="KTB">Казахский (KTB)</option>
+                    <option value="KYB">Кыргызский (KYB)</option>
                 </select>
                 <div id="status" class="status-pill" role="status" aria-live="polite">⏳ Готов</div>
             </div>
@@ -244,13 +245,14 @@
         <div id="loading-progress" class="loading-progress">
             <div id="loading-bar" class="loading-bar"></div>
         </div>
-        <div id="loading-status" class="loading-status">0 / 3 переводов</div>
+        <div id="loading-status" class="loading-status">0 / 4 переводов</div>
     </div>
 
     <!-- Data Scripts (non-module, load first) -->
     <script src="js/data/bible_data.js"></script>
     <script src="js/data/nrt_data.js"></script>
     <script src="js/data/ktb_data.js"></script>
+    <script src="js/data/kyb_data.js"></script>
 
     <!-- Main Application (ES Module) -->
     <script type="module" src="js/app.js"></script>

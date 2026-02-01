@@ -18,10 +18,12 @@ let currentDb = null;  // Will be set after data loads
 const getDatabases = () => ({
     RST: window.BIBLE_DATA,
     NRT: window.NRT_DATA,
-    KTB: window.KTB_DATA
+    KTB: window.KTB_DATA,
+    KYB: window.KYB_DATA
 });
 
 const getKtbBookMap = () => window.KTB_BOOK_MAP;
+const getKybBookMap = () => window.KYB_BOOK_MAP;
 
 // === DOM ELEMENTS ===
 const elements = {
@@ -49,7 +51,7 @@ function init() {
     // Track loading progress
     const dbs = getDatabases();
     let loaded = 0;
-    const total = 3;
+    const total = 4;
 
     const updateProgress = (count) => {
         if (loadingBar) loadingBar.style.width = `${(count / total) * 100}%`;
@@ -63,6 +65,8 @@ function init() {
     updateProgress(loaded);
     if (dbs.KTB) loaded++;
     updateProgress(loaded);
+    if (dbs.KYB) loaded++;
+    updateProgress(loaded);
 
     // Check if all data is loaded
     if (loaded < total) {
@@ -70,6 +74,7 @@ function init() {
         if (!dbs.RST) missing.push('RST');
         if (!dbs.NRT) missing.push('NRT');
         if (!dbs.KTB) missing.push('KTB');
+        if (!dbs.KYB) missing.push('KYB');
 
         if (loadingStatus) {
             loadingStatus.textContent = `Ошибка: ${missing.join(', ')}`;

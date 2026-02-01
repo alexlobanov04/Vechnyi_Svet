@@ -102,7 +102,7 @@ export function fetchVerse(parsed, db, translation = 'RST') {
             const text = versesList.map(v => v.Text).join(' ');
 
             // Use canonical title for consistency
-            const lang = translation === 'KTB' ? 'kz' : 'ru';
+            const lang = translation === 'KTB' ? 'kz' : translation === 'KYB' ? 'ky' : 'ru';
             const bookTitle = getBookTitle(parsed.canonicalCode, lang);
 
             return {
@@ -156,7 +156,7 @@ export function fullTextSearch(query, db, translation = 'RST', limit = 20) {
 
     const results = [];
     const searchTerm = query.toLowerCase().trim();
-    const lang = translation === 'KTB' ? 'kz' : 'ru';
+    const lang = translation === 'KTB' ? 'kz' : translation === 'KYB' ? 'ky' : 'ru';
 
     // Build reverse map: BookId → canonical code
     const idToCode = {};
@@ -216,7 +216,7 @@ export function getNextVerse(current, db, translation = 'RST') {
     if (!chapter) return null;
 
     const currentVerseId = parseInt(current.verse.toString().split('-')[0]);
-    const lang = translation === 'KTB' ? 'kz' : 'ru';
+    const lang = translation === 'KTB' ? 'kz' : translation === 'KYB' ? 'ky' : 'ru';
 
     // Try next verse in same chapter
     const nextVerse = chapter.Verses.find(v => v.VerseId === currentVerseId + 1);
@@ -303,7 +303,7 @@ export function getPrevVerse(current, db, translation = 'RST') {
     if (!chapter) return null;
 
     const currentVerseId = parseInt(current.verse.toString().split('-')[0]);
-    const lang = translation === 'KTB' ? 'kz' : 'ru';
+    const lang = translation === 'KTB' ? 'kz' : translation === 'KYB' ? 'ky' : 'ru';
 
     // Try previous verse in same chapter
     if (currentVerseId > 1) {

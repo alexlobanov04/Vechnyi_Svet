@@ -4,7 +4,7 @@
  * v4 - Added display.js module
  */
 
-const CACHE_NAME = 'eternal-light-v7';
+const CACHE_NAME = 'eternal-light-v9';
 
 // Core app files (always cached)
 const CORE_ASSETS = [
@@ -36,7 +36,8 @@ const CORE_ASSETS = [
 const DATA_ASSETS = [
     './js/data/bible_data.js',
     './js/data/nrt_data.js',
-    './js/data/ktb_data.js'
+    './js/data/ktb_data.js',
+    './js/data/kyb_data.js'
 ];
 
 // All assets to cache on install
