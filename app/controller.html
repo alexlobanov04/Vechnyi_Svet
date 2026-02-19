@@ -41,7 +41,7 @@
                 </div>
             </div>
 
-            <div class="sidebar-section">
+            <div id="history-section" class="sidebar-section">
                 <div class="section-header">
                     <span class="section-title">История</span>
                     <button class="btn-icon" onclick="clearHistory()" title="Очистить историю"
@@ -67,111 +67,181 @@
 
         <!-- Main -->
         <main class="main" role="main">
-            <!-- Search Row -->
-            <div class="search-row">
-                <div class="search-container">
-                    <span class="search-icon" aria-hidden="true">🔍</span>
-                    <input type="text" id="search-input" class="search-input"
-                        placeholder="Введите ссылку на стих (Ин 3:16, Быт 1:1-3...)" autocomplete="off"
-                        aria-label="Поиск стиха">
-                </div>
-                <button class="btn btn-secondary" onclick="openTextSearch()" title="Поиск по тексту"
-                    aria-label="Открыть поиск по тексту">
-                    📖 Текст
-                </button>
-                <select id="translation-select" class="translation-select" aria-label="Выбор перевода">
-                    <option value="RST">Синодальный</option>
-                    <option value="NRT">НРП</option>
-                    <option value="KTB">Казахский (KTB)</option>
-                    <option value="KYB">Кыргызский (KYB)</option>
-                </select>
-                <div id="status" class="status-pill" role="status" aria-live="polite">⏳ Готов</div>
+            <!-- Mode Switcher -->
+            <div class="mode-switcher">
+                <button id="btn-mode-bible" class="mode-btn active" onclick="switchMode('bible')">📖 Библия</button>
+                <button id="btn-mode-songs" class="mode-btn" onclick="switchMode('songs')">🎵 Песни</button>
             </div>
 
-            <!-- Bento Grid -->
-            <div class="bento-grid">
-                <!-- Preview Card (Large) -->
-                <div class="bento-card large">
-                    <div class="card-header">
-                        <span class="card-label">Предпросмотр</span>
-                        <div class="card-actions">
-                            <button class="btn-icon" id="btn-edit" onclick="toggleEditMode()" title="Редактировать"
-                                aria-label="Редактировать стих">✏️</button>
-                            <button class="btn btn-ghost" id="btn-save" onclick="saveEdit()"
-                                style="display:none;">Сохранить</button>
-                            <button class="btn btn-ghost" id="btn-cancel" onclick="cancelEdit()"
-                                style="display:none;">Отмена</button>
-                        </div>
+            <!-- BIBLE MODE -->
+            <div id="mode-bible">
+                <!-- Search Row -->
+                <div class="search-row">
+                    <div class="search-container">
+                        <span class="search-icon" aria-hidden="true">🔍</span>
+                        <input type="text" id="search-input" class="search-input"
+                            placeholder="Введите ссылку на стих (Ин 3:16, Быт 1:1-3...)" autocomplete="off"
+                            aria-label="Поиск стиха">
                     </div>
-                    <div class="verse-content">
-                        <div id="verse-text" class="verse-text placeholder">
-                            Введите ссылку и нажмите Enter для поиска стиха...
-                        </div>
-                        <textarea id="edit-area" class="edit-area" aria-label="Редактирование текста стиха"></textarea>
-                        <div id="verse-ref" class="verse-ref"></div>
-                    </div>
+                    <button class="btn btn-secondary" onclick="openTextSearch()" title="Поиск по тексту"
+                        aria-label="Открыть поиск по тексту">
+                        📖 Текст
+                    </button>
+                    <select id="translation-select" class="translation-select" aria-label="Выбор перевода">
+                        <option value="RST">Синодальный</option>
+                        <option value="NRT">НРП</option>
+                        <option value="KTB">Казахский (KTB)</option>
+                        <option value="KYB">Кыргызский (KYB)</option>
+                    </select>
+                    <div id="status" class="status-pill" role="status" aria-live="polite">⏳ Готов</div>
                 </div>
 
-                <!-- Quick Note Card -->
-                <div class="bento-card">
-                    <div class="card-header">
-                        <span class="card-label">Быстрая Заметка</span>
-                        <div class="card-actions">
-                            <button class="btn btn-primary btn-sm" onclick="showNote()"
-                                style="font-size: 13px; padding: 8px 16px;" aria-label="Транслировать заметку">
-                                📡 В Эфир
+                <!-- Bento Grid -->
+                <div class="bento-grid">
+                    <!-- Preview Card (Large) -->
+                    <div class="bento-card large">
+                        <div class="card-header">
+                            <span class="card-label">Предпросмотр</span>
+                            <div class="card-actions">
+                                <button class="btn-icon" id="btn-edit" onclick="toggleEditMode()" title="Редактировать"
+                                    aria-label="Редактировать стих">✏️</button>
+                                <button class="btn btn-ghost" id="btn-save" onclick="saveEdit()"
+                                    style="display:none;">Сохранить</button>
+                                <button class="btn btn-ghost" id="btn-cancel" onclick="cancelEdit()"
+                                    style="display:none;">Отмена</button>
+                            </div>
+                        </div>
+                        <div class="verse-content">
+                            <div id="verse-text" class="verse-text placeholder">
+                                Введите ссылку и нажмите Enter для поиска стиха...
+                            </div>
+                            <textarea id="edit-area" class="edit-area"
+                                aria-label="Редактирование текста стиха"></textarea>
+                            <div id="verse-ref" class="verse-ref"></div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Note Card -->
+                    <div class="bento-card">
+                        <div class="card-header">
+                            <span class="card-label">Быстрая Заметка</span>
+                            <div class="card-actions">
+                                <button class="btn btn-primary btn-sm" onclick="showNote()"
+                                    style="font-size: 13px; padding: 8px 16px;" aria-label="Транслировать заметку">
+                                    📡 В Эфир
+                                </button>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; height: 100%;">
+                            <textarea id="note-input" class="edit-area active"
+                                style="flex:1; font-size:16px; padding:16px; display:block; min-height: 120px; resize: none;"
+                                placeholder="Введите текст объявления..." aria-label="Текст заметки"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Live Control Card -->
+                    <div class="bento-card">
+                        <div class="card-header">
+                            <span class="card-label">Эфир</span>
+                            <div class="status-indicator live-pulse"></div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 12px; flex: 1;">
+                            <button class="btn btn-success" id="btn-broadcast" onclick="broadcastToDisplay()" disabled
+                                style="width: 100%; height: 50px; font-size: 15px;" aria-label="Транслировать стих">
+                                📡 Стих в Эфир
+                            </button>
+
+                            <!-- Navigation buttons -->
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-secondary" onclick="goToPrevVerse()"
+                                    style="flex: 1; padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                                    title="Предыдущий стих (↑)" aria-label="Предыдущий стих">
+                                    <span style="font-size: 12px;">◀</span>
+                                    <span>Пред</span>
+                                </button>
+                                <button class="btn btn-secondary" onclick="goToNextVerse()"
+                                    style="flex: 1; padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                                    title="Следующий стих (↓)" aria-label="Следующий стих">
+                                    <span>След</span>
+                                    <span style="font-size: 12px;">▶</span>
+                                </button>
+                            </div>
+
+                            <button class="btn btn-secondary" onclick="hideFromDisplay()" title="Очистить экран"
+                                style="width: 100%; color: var(--text-tertiary); border-style: dashed;"
+                                aria-label="Скрыть с экрана">
+                                ⬛ Скрыть (Esc)
+                            </button>
+                        </div>
+
+                        <div
+                            style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border); font-size: 11px; color: var(--text-tertiary); text-align: center;">
+                            ↑↓ = Навигация • Ctrl+Enter = Эфир
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SONGS MODE -->
+            <div id="mode-songs" style="display: none;">
+                <!-- Song Search Row -->
+                <div class="search-row">
+                    <div class="search-container">
+                        <span class="search-icon" aria-hidden="true">🎵</span>
+                        <input type="text" id="song-search-input" class="search-input"
+                            placeholder="Поиск песни (номер, название или текст)" autocomplete="off"
+                            aria-label="Поиск песни">
+                    </div>
+                    <select id="songbook-select" class="translation-select" aria-label="Выбор сборника">
+                        <option value="all">Все сборники</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="openAddSongModal()" aria-label="Добавить песню">
+                        ➕ Добавить
+                    </button>
+                </div>
+
+                <!-- Songs Content -->
+                <div class="songs-container" style="display: flex; gap: 20px; height: calc(100vh - 140px);">
+                    <!-- Song List -->
+                    <div class="bento-card" style="flex: 1; display: flex; flex-direction: column; height: 100%;">
+                        <div class="card-header">
+                            <span class="card-label">Список песен</span>
+                            <div style="font-size: 12px; color: var(--text-tertiary);" id="songs-count">0 песен</div>
+                        </div>
+                        <div id="songs-list" class="history-list" style="flex: 1; overflow-y: auto;">
+                            <!-- Items via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Song Preview -->
+                    <div class="bento-card large" style="flex: 2; display: flex; flex-direction: column; height: 100%;">
+                        <div class="card-header">
+                            <span class="card-label">Предпросмотр</span>
+                            <div class="card-actions">
+                                <button class="btn-icon" onclick="editCurrentSong()" title="Редактировать">✏️</button>
+                                <button class="btn btn-success" onclick="broadcastSong()" id="btn-broadcast-song"
+                                    disabled>📡 В Эфир</button>
+                            </div>
+                        </div>
+                        <div class="verse-content" style="overflow-y: auto; flex: 1;">
+                            <div id="song-preview-text" class="verse-text placeholder song-preview-container">
+                                Выберите песню из списка
+                            </div>
+                        </div>
+                        <div class="card-footer"
+                            style="padding-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <div class="song-nav-group">
+                                <button class="btn btn-secondary song-nav-btn" onclick="goToPrevStanza()"
+                                    title="Предыдущий куплет (←)">◄</button>
+                                <button class="btn btn-secondary song-nav-btn" onclick="goToNextStanza()"
+                                    title="Следующий куплет (→)">►</button>
+                            </div>
+                            <button class="btn btn-secondary" onclick="hideFromDisplay()" aria-label="Скрыть с экрана">
+                                ⬛ Скрыть
                             </button>
                         </div>
                     </div>
-                    <div style="display: flex; flex-direction: column; height: 100%;">
-                        <textarea id="note-input" class="edit-area active"
-                            style="flex:1; font-size:16px; padding:16px; display:block; min-height: 120px; resize: none;"
-                            placeholder="Введите текст объявления..." aria-label="Текст заметки"></textarea>
-                    </div>
                 </div>
-
-                <!-- Live Control Card -->
-                <div class="bento-card">
-                    <div class="card-header">
-                        <span class="card-label">Эфир</span>
-                        <div class="status-indicator live-pulse"></div>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 12px; flex: 1;">
-                        <button class="btn btn-success" id="btn-broadcast" onclick="broadcastToDisplay()" disabled
-                            style="width: 100%; height: 50px; font-size: 15px;" aria-label="Транслировать стих">
-                            📡 Стих в Эфир
-                        </button>
-
-                        <!-- Navigation buttons -->
-                        <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-secondary" onclick="goToPrevVerse()"
-                                style="flex: 1; padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 6px;"
-                                title="Предыдущий стих (↑)" aria-label="Предыдущий стих">
-                                <span style="font-size: 12px;">◀</span>
-                                <span>Пред</span>
-                            </button>
-                            <button class="btn btn-secondary" onclick="goToNextVerse()"
-                                style="flex: 1; padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 6px;"
-                                title="Следующий стих (↓)" aria-label="Следующий стих">
-                                <span>След</span>
-                                <span style="font-size: 12px;">▶</span>
-                            </button>
-                        </div>
-
-                        <button class="btn btn-secondary" onclick="hideFromDisplay()" title="Очистить экран"
-                            style="width: 100%; color: var(--text-tertiary); border-style: dashed;"
-                            aria-label="Скрыть с экрана">
-                            ⬛ Скрыть (Esc)
-                        </button>
-                    </div>
-
-                    <div
-                        style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--glass-border); font-size: 11px; color: var(--text-tertiary); text-align: center;">
-                        ↑↓ = Навигация • Ctrl+Enter = Эфир
-                    </div>
-                </div>
-
-
             </div>
         </main>
     </div>
@@ -238,6 +308,40 @@
         </div>
     </div>
 
+    <!-- Add/Edit Song Modal -->
+    <div id="song-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="song-modal-title">
+        <div class="modal" style="width: 600px;">
+            <div class="modal-header">
+                <h2 id="song-modal-title" class="modal-title">🎵 Добавить песню</h2>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="song-id">
+                <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Номер</label>
+                        <input type="text" id="song-number" class="search-input" placeholder="№"
+                            style="padding-left: 12px;">
+                    </div>
+                    <div class="form-group" style="flex: 3;">
+                        <label class="form-label">Название</label>
+                        <input type="text" id="song-title" class="search-input" placeholder="Название песни"
+                            style="padding-left: 12px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Текст песни</label>
+                    <textarea id="song-text" class="edit-area active"
+                        style="min-height: 300px; padding: 12px; font-size: 16px;"
+                        placeholder="Введите текст песни...\n\nРазделяйте куплеты пустой строкой."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSongModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveSongForm()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading -->
     <div id="loading" class="loading-overlay" role="status" aria-label="Загрузка">
         <div class="loader" aria-hidden="true"></div>
@@ -253,9 +357,10 @@
     <script src="js/data/nrt_data.js"></script>
     <script src="js/data/ktb_data.js"></script>
     <script src="js/data/kyb_data.js"></script>
+    <script src="js/data/songs_data.js"></script>
 
     <!-- Main Application (ES Module) -->
-    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/app.js?v=3"></script>
 
     <!-- Legacy global functions for onclick handlers -->
     <script>

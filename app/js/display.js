@@ -23,10 +23,13 @@ function handleMessage(payload) {
 
     switch (type) {
         case 'SHOW_VERSE':
-            updateDisplay(data, false);
+            updateDisplay(data, 'verse');
+            break;
+        case 'SHOW_SONG':
+            updateDisplay(data, 'song');
             break;
         case 'SHOW_NOTE':
-            updateDisplay(data, true);
+            updateDisplay(data, 'note');
             break;
         case 'HIDE_VERSE':
             hideDisplay();
@@ -77,25 +80,66 @@ function applySettings(settings) {
 /**
  * Update display with verse or note content
  * @param {Object} data - Content data with text and reference
- * @param {boolean} isNote - Whether this is a note (no reference)
+ * @param {string} mode - 'verse', 'note', or 'song'
  */
-function updateDisplay(data, isNote = false) {
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function updateDisplay(data, mode = 'verse') {
     if (!data || !data.text) return;
 
     container.classList.remove('visible');
 
     setTimeout(() => {
-        // Safe: using innerHTML for formatting (data sources are trusted)
-        content.innerHTML = data.text;
+        // Reset all inline styles to prevent leakage between modes
+        content.style.fontSize = '';
+        content.style.whiteSpace = '';
+        content.style.textAlign = '';
+        ref.style.display = '';
 
-        if (isNote) {
+        // Prepare content based on mode
+        if (mode === 'song') {
+            // Song mode: display single stanza sent by controller
+            content.innerHTML = escapeHtml(data.text).replace(/\n/g, '<br>');
+            ref.style.display = 'none'; // Hide reference/label for songs as requested
+
+            // Build reference: song title + stanza label + position
+            let refText = `${data.number ? data.number + '. ' : ''}${data.title}`;
+            if (data.stanzaLabel) {
+                refText += ` — ${data.stanzaLabel}`;
+            }
+            if (data.stanzaIndex && data.stanzaTotal) {
+                refText += ` (${data.stanzaIndex}/${data.stanzaTotal})`;
+            }
+            ref.textContent = refText;
+
+            // Determine font size based on stanza text length
+            const textLength = data.text.length;
+            if (textLength > 200) content.style.fontSize = '4vw';
+            else if (textLength > 100) content.style.fontSize = '5vw';
+            else content.style.fontSize = '6vw';
+
+            content.style.whiteSpace = 'normal';
+            content.style.textAlign = 'center';
+
+        } else if (mode === 'note') {
+            content.innerHTML = escapeHtml(data.text);
             ref.style.display = 'none';
             content.style.fontSize = '4vw';
+            content.style.whiteSpace = 'pre-wrap';
+
         } else {
+            // Verse logic
+            content.innerHTML = data.text;
             ref.style.display = 'block';
             ref.textContent = data.reference || '';
 
-            // Auto-size based on text length
             const length = data.text.length;
             if (length > 300) {
                 content.style.fontSize = '3vw';
@@ -104,6 +148,8 @@ function updateDisplay(data, isNote = false) {
             } else {
                 content.style.fontSize = '5vw';
             }
+            content.style.whiteSpace = 'normal';
+            content.style.textAlign = 'left';
         }
 
         idle.style.display = 'none';

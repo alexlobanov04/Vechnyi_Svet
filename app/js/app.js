@@ -3,14 +3,20 @@
  * Integrates all modules for the Eternal Light controller interface
  */
 
+// Imports updated
 import { parseQuery, fetchVerse, fullTextSearch, getNextVerse, getPrevVerse } from './modules/search.js';
-import { showVerse, showNote, hideDisplay, updateDisplaySettings, openDisplayWindow, setDisplayWindow, isDisplayAvailable } from './modules/broadcast.js';
+import { showVerse, showNote, showSong, hideDisplay, updateDisplaySettings, openDisplayWindow, setDisplayWindow, isDisplayAvailable } from './modules/broadcast.js';
 import { addToHistory, renderHistory, getFromHistory, clearHistory as clearHistoryData } from './modules/history.js';
 import { loadSettings, saveSettings, getEdit, saveEdit } from './modules/settings.js';
 import { updateStatus } from './modules/dom-utils.js';
+import { loadSongbooks, getSongbooks, saveSong, searchSongs, deleteSong } from './modules/songs.js';
 
 // === STATE ===
 let currentVerse = null;
+let currentSong = null;
+let currentStanzas = [];   // parsed stanzas [{text, label, isChorus}]
+let currentStanzaIndex = 0;
+let currentMode = 'bible'; // 'bible' or 'songs'
 let currentDb = null;  // Will be set after data loads
 
 // === DATABASE REFERENCES ===
@@ -40,11 +46,28 @@ const elements = {
     themeSelect: document.getElementById('theme-select'),
     sizeRange: document.getElementById('size-range'),
     settingsModal: document.getElementById('settings-modal'),
-    loading: document.getElementById('loading')
+    loading: document.getElementById('loading'),
+
+    // Song Mode Elements
+    modeBible: document.getElementById('mode-bible'),
+    modeSongs: document.getElementById('mode-songs'),
+    btnModeBible: document.getElementById('btn-mode-bible'),
+    btnModeSongs: document.getElementById('btn-mode-songs'),
+    songSearch: document.getElementById('song-search-input'),
+    songbookSelect: document.getElementById('songbook-select'),
+    songsList: document.getElementById('songs-list'),
+    songsCount: document.getElementById('songs-count'),
+    songPreviewText: document.getElementById('song-preview-text'),
+    btnBroadcastSong: document.getElementById('btn-broadcast-song'),
+    songModal: document.getElementById('song-modal'),
+    songFormId: document.getElementById('song-id'),
+    songFormNumber: document.getElementById('song-number'),
+    songFormTitle: document.getElementById('song-title'),
+    songFormText: document.getElementById('song-text')
 };
 
 // === INITIALIZATION ===
-function init() {
+async function init() {
     const loadingBar = document.getElementById('loading-bar');
     const loadingStatus = document.getElementById('loading-status');
 
@@ -83,6 +106,11 @@ function init() {
         return;
     }
 
+    // Load Songbooks
+    await loadSongbooks();
+    populateSongbookSelector();
+    renderSongList();
+
     // Hide loading overlay with fade
     setTimeout(() => {
         elements.loading.style.opacity = '0';
@@ -109,6 +137,10 @@ function init() {
 function setupEventListeners() {
     // Search input
     elements.input.addEventListener('keydown', handleSearch);
+
+    // Song Search
+    elements.songSearch.addEventListener('input', handleSongSearch);
+    elements.songbookSelect.addEventListener('change', handleSongbookChange);
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', handleGlobalKeys);
@@ -204,19 +236,42 @@ function handleGlobalKeys(e) {
 
     if (e.key === 'Escape') {
         hideFromDisplay();
+        // Also close modals if open
+        closeSongModal();
+        closeTextSearch();
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && currentVerse) {
-        broadcastToDisplay();
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (currentMode === 'bible' && currentVerse) {
+            broadcastToDisplay();
+        } else if (currentMode === 'songs' && currentSong) {
+            broadcastSong();
+        }
     }
-    // Arrow navigation (only when not typing)
-    if (!isTyping && currentVerse) {
+
+    // Stanza navigation with arrows in song mode
+    if (!isTyping && currentMode === 'songs' && currentSong) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
             e.preventDefault();
-            goToNextVerse();
+            goToNextStanza();
         }
         if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
             e.preventDefault();
-            goToPrevVerse();
+            goToPrevStanza();
+        }
+    }
+
+    // Arrow navigation (only when not typing)
+    if (!isTyping) {
+        if (currentMode === 'bible' && currentVerse) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                goToNextVerse();
+            }
+            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                goToPrevVerse();
+            }
         }
     }
 }
@@ -286,6 +341,7 @@ function hideFromDisplay() {
 
 // === HISTORY ===
 function loadFromHistory(index) {
+    if (currentMode !== 'bible') switchMode('bible');
     const verse = getFromHistory(index);
     if (verse) {
         currentVerse = verse;
@@ -439,6 +495,413 @@ window.clearHistory = function () {
 };
 
 
+// === SONG MODE LOGIC ===
+window.switchMode = function (mode) {
+    if (mode === currentMode) return;
+
+    currentMode = mode;
+
+    // Toggle Buttons
+    elements.btnModeBible.classList.toggle('active', mode === 'bible');
+    elements.btnModeSongs.classList.toggle('active', mode === 'songs');
+
+    // Toggle Content
+    elements.modeBible.style.display = mode === 'bible' ? 'block' : 'none';
+    elements.modeSongs.style.display = mode === 'songs' ? 'block' : 'none';
+
+    // Toggle History sidebar section (only relevant for Bible mode)
+    const historySection = document.getElementById('history-section');
+    if (historySection) {
+        historySection.style.display = mode === 'bible' ? 'block' : 'none';
+    }
+
+    if (mode === 'songs') {
+        renderSongList(elements.songSearch.value, elements.songbookSelect.value);
+        elements.songSearch.focus();
+    } else {
+        elements.input.focus();
+    }
+};
+
+window.openAddSongModal = function () {
+    elements.songFormId.value = '';
+    elements.songFormNumber.value = '';
+    elements.songFormTitle.value = '';
+    elements.songFormText.value = '';
+
+    document.getElementById('song-modal-title').textContent = '🎵 Добавить песню';
+    elements.songModal.classList.add('active');
+    elements.songFormNumber.focus();
+};
+
+window.closeSongModal = function () {
+    elements.songModal.classList.remove('active');
+};
+
+window.saveSongForm = function () {
+    const number = elements.songFormNumber.value.trim();
+    const title = elements.songFormTitle.value.trim();
+    const text = elements.songFormText.value.trim();
+    const id = elements.songFormId.value;
+
+    if (!title || !text) {
+        alert('Введите название и текст песни');
+        return;
+    }
+
+    saveSong({ id, number, title, text });
+
+    // Refresh list
+    renderSongList(elements.songSearch.value, elements.songbookSelect.value);
+
+    closeSongModal();
+};
+
+window.editCurrentSong = function () {
+    if (!currentSong) return;
+
+    elements.songFormId.value = currentSong.id;
+    elements.songFormNumber.value = currentSong.number;
+    elements.songFormTitle.value = currentSong.title;
+    elements.songFormText.value = currentSong.text;
+
+    document.getElementById('song-modal-title').textContent = '✏️ Редактировать песню';
+    elements.songModal.classList.add('active');
+};
+
+function handleSongSearch(e) {
+    const query = e.target.value;
+    const bookId = elements.songbookSelect.value;
+    renderSongList(query, bookId);
+}
+
+function handleSongbookChange() {
+    const query = elements.songSearch.value;
+    const bookId = elements.songbookSelect.value;
+    renderSongList(query, bookId);
+}
+
+function populateSongbookSelector() {
+    const books = getSongbooks();
+    // Keep the default 'all' option, add each book
+    books.forEach(book => {
+        const option = document.createElement('option');
+        option.value = book.id;
+        option.textContent = book.title;
+        elements.songbookSelect.appendChild(option);
+    });
+}
+
+function renderSongList(query = '', bookId = 'all') {
+    const songs = searchSongs(query, bookId);
+
+    elements.songsCount.textContent = `${songs.length} песен`;
+    elements.songsList.innerHTML = '';
+
+    if (songs.length === 0) {
+        elements.songsList.innerHTML = '<div style="padding: 20px; color: var(--text-tertiary); text-align: center;">Нет песен</div>';
+        return;
+    }
+
+    // Sort by song number (numeric if possible) then alpha
+    songs.sort((a, b) => {
+        const numA = parseInt(a.number);
+        const numB = parseInt(b.number);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.title.localeCompare(b.title);
+    });
+
+    songs.forEach(song => {
+        const div = document.createElement('div');
+        div.className = 'song-item';
+        if (currentSong && currentSong.id === song.id) div.classList.add('active');
+
+        const headerRow = document.createElement('div');
+        headerRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center;';
+
+        const numberSpan = document.createElement('span');
+        numberSpan.className = 'song-number';
+        numberSpan.textContent = song.number ? '№' + song.number : '';
+        headerRow.appendChild(numberSpan);
+
+        // Only show delete button for user-created songs
+        if (song.bookId === 'user') {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-icon';
+            deleteBtn.style.cssText = 'width:28px; height:28px; font-size:14px; border:none; opacity:0.4;';
+            deleteBtn.textContent = '🗑';
+            deleteBtn.title = 'Удалить';
+            deleteBtn.onclick = (e) => { e.stopPropagation(); confirmDeleteSong(song); };
+            headerRow.appendChild(deleteBtn);
+        }
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'song-title';
+        titleDiv.textContent = song.title;
+
+        const previewDiv = document.createElement('div');
+        previewDiv.className = 'song-preview';
+        previewDiv.textContent = (song.text.split('\n')[0] || '') + '...';
+
+        div.appendChild(headerRow);
+        div.appendChild(titleDiv);
+        div.appendChild(previewDiv);
+
+        div.onclick = () => selectSong(song);
+        elements.songsList.appendChild(div);
+    });
+}
+
+function selectSong(song) {
+    currentSong = song;
+
+    // Parse stanzas
+    currentStanzas = parseSongStanzas(song);
+    currentStanzaIndex = 0;
+
+    renderSongList(elements.songSearch.value, elements.songbookSelect.value);
+
+    // Render song text with verse separation
+    renderSongPreview(song);
+    elements.songPreviewText.classList.remove('placeholder');
+    elements.btnBroadcastSong.disabled = false;
+
+    // Scroll active song into view in the list
+    const activeItem = elements.songsList.querySelector('.song-item.active');
+    if (activeItem) {
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+/**
+ * Parse song text into stanzas with labels
+ */
+function parseSongStanzas(song) {
+    const rawStanzas = song.text.split('\n\n');
+    let verseNum = 0;
+    const chorusTracker = new Set();
+    const result = [];
+
+    rawStanzas.forEach(stanza => {
+        const trimmed = stanza.trim();
+        if (!trimmed) return;
+
+        const isChorus = chorusTracker.has(trimmed);
+        if (!isChorus) {
+            chorusTracker.add(trimmed);
+        }
+
+        if (!isChorus) verseNum++;
+
+        result.push({
+            text: trimmed,
+            label: isChorus ? 'Припев' : `Куплет ${verseNum}`,
+            isChorus
+        });
+    });
+
+    return result;
+}
+
+/**
+ * Render song text with visually separated verses/choruses
+ */
+function renderSongPreview(song) {
+    const container = elements.songPreviewText;
+    container.innerHTML = '';
+
+    currentStanzas.forEach((stanza, idx) => {
+        const block = document.createElement('div');
+        block.className = 'song-stanza ' + (stanza.isChorus ? 'chorus' : 'verse');
+        if (idx === currentStanzaIndex) block.classList.add('active');
+
+        // Clickable to jump to stanza
+        block.style.cursor = 'pointer';
+        block.addEventListener('click', () => {
+            currentStanzaIndex = idx;
+            highlightActiveStanza();
+            broadcastCurrentStanza();
+        });
+
+        // Add label
+        const label = document.createElement('div');
+        label.className = 'stanza-label';
+        label.textContent = stanza.label;
+        block.appendChild(label);
+
+        // Add text lines
+        const textDiv = document.createElement('div');
+        textDiv.className = 'stanza-text';
+        textDiv.innerHTML = escapeHtmlForPreview(stanza.text).replace(/\n/g, '<br>');
+        block.appendChild(textDiv);
+
+        container.appendChild(block);
+    });
+}
+
+/**
+ * Highlight the active stanza in the preview
+ */
+function highlightActiveStanza() {
+    const blocks = elements.songPreviewText.querySelectorAll('.song-stanza');
+    blocks.forEach((block, idx) => {
+        block.classList.toggle('active', idx === currentStanzaIndex);
+    });
+    // Scroll active stanza into view
+    const activeBlock = blocks[currentStanzaIndex];
+    if (activeBlock) {
+        activeBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+/**
+ * Broadcast only the current stanza to display
+ */
+function broadcastCurrentStanza() {
+    if (!currentSong || !currentStanzas.length) return;
+    const stanza = currentStanzas[currentStanzaIndex];
+    if (!stanza) return;
+
+    // Always try to show song (handles BroadcastChannel + Window)
+    const success = showSong({
+        title: currentSong.title,
+        number: currentSong.number,
+        text: stanza.text,
+        stanzaLabel: stanza.label,
+        stanzaIndex: currentStanzaIndex + 1,
+        stanzaTotal: currentStanzas.length
+    });
+
+    const label = stanza.label;
+    if (success || isDisplayAvailable()) {
+        updateStatus(elements.status, `🎵 ${currentSong.number ? '#' + currentSong.number + ' ' : ''}${currentSong.title} — ${label}`, 'broadcasting');
+    } else {
+        // Even if showSong returns false (no window), we might have sent via channel.
+        // We'll assume success if we are in a context where channel works, but show warning if strict.
+        // For now, let's show broadcasting status but maybe with a warning if window missing?
+        // Actually, sendToDisplay returns false if window missing.
+        // But we want to indicate it "Sent to Network".
+        updateStatus(elements.status, `📡 ${label} >> Эфир`, 'broadcasting');
+    }
+}
+
+/**
+ * Safe HTML escape for song preview
+ */
+function escapeHtmlForPreview(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * Navigate to next stanza, or next song if at the end
+ */
+function goToNextStanza() {
+    if (!currentSong || !currentStanzas.length) return;
+    if (currentStanzaIndex < currentStanzas.length - 1) {
+        currentStanzaIndex++;
+        highlightActiveStanza();
+        broadcastCurrentStanza();
+    } else {
+        // Move to next song
+        const songs = getCurrentSongList();
+        const idx = songs.findIndex(s => s.id === currentSong.id);
+        if (idx < songs.length - 1) {
+            selectSong(songs[idx + 1]);
+            broadcastCurrentStanza();
+        }
+    }
+}
+
+/**
+ * Navigate to previous stanza, or previous song if at the start
+ */
+function goToPrevStanza() {
+    if (!currentSong || !currentStanzas.length) return;
+    if (currentStanzaIndex > 0) {
+        currentStanzaIndex--;
+        highlightActiveStanza();
+        broadcastCurrentStanza();
+    } else {
+        // Move to previous song (last stanza)
+        const songs = getCurrentSongList();
+        const idx = songs.findIndex(s => s.id === currentSong.id);
+        if (idx > 0) {
+            selectSong(songs[idx - 1]);
+            currentStanzaIndex = currentStanzas.length - 1;
+            highlightActiveStanza();
+            broadcastCurrentStanza();
+        }
+    }
+}
+
+/**
+ * Navigate to next song in the currently displayed list
+ */
+function goToNextSong() {
+    const songs = getCurrentSongList();
+    if (!songs.length || !currentSong) return;
+    const idx = songs.findIndex(s => s.id === currentSong.id);
+    if (idx < songs.length - 1) {
+        selectSong(songs[idx + 1]);
+    }
+}
+
+/**
+ * Navigate to previous song in the currently displayed list
+ */
+function goToPrevSong() {
+    const songs = getCurrentSongList();
+    if (!songs.length || !currentSong) return;
+    const idx = songs.findIndex(s => s.id === currentSong.id);
+    if (idx > 0) {
+        selectSong(songs[idx - 1]);
+    }
+}
+
+/**
+ * Get the current filtered and sorted song list
+ */
+function getCurrentSongList() {
+    const query = elements.songSearch.value;
+    const bookId = elements.songbookSelect.value;
+    const songs = searchSongs(query, bookId);
+    songs.sort((a, b) => {
+        const numA = parseInt(a.number);
+        const numB = parseInt(b.number);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.title.localeCompare(b.title);
+    });
+    return songs;
+}
+
+window.broadcastSong = function () {
+    if (!currentSong) return;
+    broadcastCurrentStanza();
+};
+
+window.goToNextSong = goToNextSong;
+window.goToPrevSong = goToPrevSong;
+window.goToNextStanza = goToNextStanza;
+window.goToPrevStanza = goToPrevStanza;
+
+function confirmDeleteSong(song) {
+    if (!confirm(`Удалить песню "${song.title}"?`)) return;
+
+    deleteSong(song.id);
+
+    // Clear selection if deleted song was selected
+    if (currentSong && currentSong.id === song.id) {
+        currentSong = null;
+        elements.songPreviewText.textContent = 'Выберите песню из списка';
+        elements.songPreviewText.classList.add('placeholder');
+        elements.btnBroadcastSong.disabled = true;
+    }
+
+    renderSongList(elements.songSearch.value, elements.songbookSelect.value);
+}
+
 
 // === REGISTER SERVICE WORKER ===
 if ('serviceWorker' in navigator) {
@@ -483,6 +946,8 @@ window.openTextSearch = function () {
 
 window.closeTextSearch = function () {
     const modal = document.getElementById('text-search-modal');
+    const modalResults = document.getElementById('text-search-results');
+    modalResults.innerHTML = '<div class="search-results-placeholder" style="color: var(--text-tertiary); text-align: center; padding: 40px;">Введите текст и нажмите Enter</div>';
     modal.classList.remove('active');
 };
 

@@ -73,6 +73,15 @@ export function showNote(text) {
 }
 
 /**
+ * Show a song on the display
+ * @param {Object} songData - Song data
+ * @returns {boolean}
+ */
+export function showSong(songData) {
+    return sendToDisplay('SHOW_SONG', songData);
+}
+
+/**
  * Hide the current display content
  * @returns {boolean}
  */
