@@ -107,9 +107,14 @@ function updateDisplay(data, mode = 'verse') {
         if (mode === 'song') {
             // Song mode: display single stanza sent by controller
             content.innerHTML = escapeHtml(data.text).replace(/\n/g, '<br>');
-            ref.style.display = 'none'; // Hide reference/label for songs as requested
+            ref.style.display = 'none'; // Hide reference element
+            ref.style.visibility = 'hidden'; // Double ensure hidden
+            ref.textContent = ''; // Clear text content
+            ref.innerHTML = ''; // Clear HTML content
 
-            // Build reference: song title + stanza label + position
+            // Build reference (kept for logic but not displayed)
+            let refText = ''; // Dont build it
+            /*
             let refText = `${data.number ? data.number + '. ' : ''}${data.title}`;
             if (data.stanzaLabel) {
                 refText += ` — ${data.stanzaLabel}`;
@@ -118,6 +123,7 @@ function updateDisplay(data, mode = 'verse') {
                 refText += ` (${data.stanzaIndex}/${data.stanzaTotal})`;
             }
             ref.textContent = refText;
+            */
 
             // Determine font size based on stanza text length
             const textLength = data.text.length;
