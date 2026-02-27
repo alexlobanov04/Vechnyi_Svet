@@ -10,11 +10,12 @@ import {
     TRANSLATION_MAPS,
     getCanonicalCode,
     getBookId,
-    getBookTitle
+    getBookTitle,
+    getBookTitleById
 } from './canonical.js';
 
 // Re-export for backwards compatibility
-export { getBookTitle, BOOK_INFO, TRANSLATION_MAPS };
+export { getBookTitle, getBookTitleById, BOOK_INFO, TRANSLATION_MAPS };
 
 /**
  * Parse a verse reference query string
@@ -22,10 +23,26 @@ export { getBookTitle, BOOK_INFO, TRANSLATION_MAPS };
  * @returns {Object|null} Parsed reference with canonicalCode, or null
  */
 export function parseQuery(query) {
-    query = query.toLowerCase().replace(/[:]/g, ' ').replace(/\s+/g, ' ').trim();
+    query = query.toLowerCase()
+        .replace(/[:.,]/g, ' ')
+        // Remove standard "глава", "стих" noise words
+        .replace(/\b(глава|гл|главы|стих|ст|стихи)\b/g, ' ')
+        // Remove Gospel prefixes: "от матфея" -> "матфея"
+        .replace(/\bот\s+/g, '')
+        // Remove Russian numeric suffixes: "1-я " -> "1 ", "2-е " -> "2 "
+        .replace(/(\d+)(?:-?[еяй])\s+/g, '$1 ')
+        // Typo corrections based on common user mistakes
+        .replace(/парапалеменнон|параполеменон|парапалемилион/g, 'паралипоменон')
+        .replace(/еккелисиаст/g, 'екклесиаст')
+        .replace(/фесолоникийцам/g, 'фессалоникийцам')
+        .replace(/песни\s+песней/g, 'песнь песней')
+        .replace(/плач\s+иеремия/g, 'плач иеремии')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-    // Regex for book names like "1 кор" or "ин"
-    const match = query.match(/^(\d?\s?[а-яёa-z]+)\s+(\d+)\s*([\d\-\,]*)$/);
+    // The robust regex matches anything up to the last two numbers (or one number)
+    // ^(.+?)\s+(\d+) matches any string until the first number that isn't attached to the start.
+    const match = query.match(/^(.+?)\s+(\d+)(?:\s+([\d\-\,]+))?$/);
 
     if (!match) return null;
 

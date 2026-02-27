@@ -71,6 +71,8 @@ const BIBLE_BOOKS = {
     "откр": 66, "откровение": 66
 };
 
+window.BIBLE_BOOKS = BIBLE_BOOKS;
+
 // Канал для связи между окнами
 const channel = new BroadcastChannel('bible_display');
 

@@ -1,0 +1,9 @@
+BROWSER_LOG: warning Failed to decode downloaded font: http://localhost:8081/fonts/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZJhjp-Ek-_EeA.woff2
+BROWSER_LOG: warning OTS parsing error: invalid sfntVersion: 1008813135
+BROWSER_LOG: warning Failed to decode downloaded font: http://localhost:8081/fonts/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZJhjp-Ek-_EeA.woff2
+BROWSER_LOG: warning OTS parsing error: invalid sfntVersion: 1008813135
+BROWSER_LOG: log 📚 Loaded 2 songbooks, 806 songs from SONGS_DATA
+BROWSER_LOG: log ✅ Service Worker зарегистрирован
+Clicking verse...
+Modal active: false
+Input Value: Чыгуу 20:3

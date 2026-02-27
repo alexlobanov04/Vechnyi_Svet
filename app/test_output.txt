@@ -1,0 +1,4 @@
+CRITICAL TEST FAILURE: browserContext.waitForEvent: Timeout 30000ms exceeded while waiting for event "page"
+    at /Users/alex/Eternal-Light/app/test_all.mjs:23:21 {
+  name: 'TimeoutError'
+}

@@ -154,9 +154,16 @@ export const TRANSLATION_MAPS = {
 // Build reverse lookup: abbreviation → canonical code
 const _abbrToCode = {};
 for (const [code, info] of Object.entries(BOOK_INFO)) {
+    // Register explicit abbreviations
     for (const abbr of info.abbr) {
         _abbrToCode[abbr] = code;
     }
+    // Automatically register the exact localized titles without spaces/dashes!
+    // This perfectly catches titles like "1-е Коринфянам", "Песнь Песней", "Плач Иеремии" when clicked in visual nav.
+    const normalizeTitle = (t) => t.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
+    if (info.ru) _abbrToCode[normalizeTitle(info.ru)] = code;
+    if (info.kz) _abbrToCode[normalizeTitle(info.kz)] = code;
+    if (info.ky) _abbrToCode[normalizeTitle(info.ky)] = code;
 }
 
 /**
@@ -201,4 +208,21 @@ export function getBookTitle(canonicalCode, lang = 'ru') {
  */
 export function getSupportedTranslations() {
     return Object.keys(TRANSLATION_MAPS);
+}
+
+/**
+ * Get book title by translation and bookId
+ * @param {number} bookId - Like 1, 2, 3
+ * @param {string} translation - Like "RST", "NRT"
+ * @param {string} lang - "ru", "kz", "ky"
+ * @returns {string} Book title
+ */
+export function getBookTitleById(bookId, translation, lang = 'ru') {
+    const map = TRANSLATION_MAPS[translation];
+    if (!map) return "Библия";
+
+    const canonicalCode = Object.keys(map).find(key => map[key] === bookId);
+    if (!canonicalCode) return "Библия";
+
+    return getBookTitle(canonicalCode, lang);
 }

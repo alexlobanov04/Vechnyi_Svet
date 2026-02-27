@@ -8,7 +8,8 @@ const EDITS_KEY = 'bible_edits';
 
 const DEFAULT_SETTINGS = {
     font: "'Playfair Display', serif",
-    theme: 'blue',
+    theme: '#0f172a',
+    textColor: '#ffffff',
     size: 100
 };
 

@@ -4,20 +4,56 @@
  */
 
 // Imports updated
-import { parseQuery, fetchVerse, fullTextSearch, getNextVerse, getPrevVerse } from './modules/search.js';
-import { showVerse, showNote, showSong, hideDisplay, updateDisplaySettings, openDisplayWindow, setDisplayWindow, isDisplayAvailable } from './modules/broadcast.js';
+import { parseQuery, fetchVerse, fullTextSearch, getNextVerse, getPrevVerse, getBookTitle, BIBLE_BOOKS, getBookTitleById } from './modules/search.js';
+import { showVerse, showNote, showSong, showSlide, hideDisplay, updateDisplaySettings, openDisplayWindow, sendToDisplay, setDisplayWindow, isDisplayAvailable } from './modules/broadcast.js';
 import { addToHistory, renderHistory, getFromHistory, clearHistory as clearHistoryData } from './modules/history.js';
 import { loadSettings, saveSettings, getEdit, saveEdit } from './modules/settings.js';
 import { updateStatus } from './modules/dom-utils.js';
 import { loadSongbooks, getSongbooks, saveSong, searchSongs, deleteSong } from './modules/songs.js';
+import { initDB, savePresentation, loadPresentations, getPresentation, deletePresentation, hardDeletePresentation, restorePresentation, processFiles } from './modules/presentations.js';
+import {
+    initDB as initBgDB,
+    saveBackground,
+    loadBackgrounds,
+    deleteBackground,
+    getActiveBackgroundId,
+    setActiveBackgroundId
+} from './modules/backgrounds.js';
+import {
+    initBibleUI,
+    handleSearch,
+    goToNextVerse,
+    goToPrevVerse,
+    openTextSearch,
+    closeTextSearch,
+    openBibleNavModal,
+    closeBibleNavModal,
+    bibleNavGoBack
+} from './modules/bible-ui.js';
 
-// === STATE ===
-let currentVerse = null;
-let currentSong = null;
-let currentStanzas = [];   // parsed stanzas [{text, label, isChorus}]
-let currentStanzaIndex = 0;
-let currentMode = 'bible'; // 'bible' or 'songs'
-let currentDb = null;  // Will be set after data loads
+import {
+    openAddSongModal,
+    closeSongModal,
+    insertSongTag,
+    saveSongForm,
+    editCurrentSong,
+    handleSongSearch,
+    handleSongbookChange,
+    populateSongbookSelector,
+    renderSongList,
+    goToNextStanza,
+    goToPrevStanza,
+    broadcastSong,
+    confirmDeleteSong
+} from './modules/songs-ui.js';
+
+import { initNotesUI, broadcastNote } from './modules/notes-ui.js';
+
+import { state, elements } from './modules/state.js';
+
+
+
+
 
 // === DATABASE REFERENCES ===
 // These will be available globally after script loads
@@ -30,41 +66,6 @@ const getDatabases = () => ({
 
 const getKtbBookMap = () => window.KTB_BOOK_MAP;
 const getKybBookMap = () => window.KYB_BOOK_MAP;
-
-// === DOM ELEMENTS ===
-const elements = {
-    input: document.getElementById('search-input'),
-    status: document.getElementById('status'),
-    verseText: document.getElementById('verse-text'),
-    verseRef: document.getElementById('verse-ref'),
-    btnBroadcast: document.getElementById('btn-broadcast'),
-    historyList: document.getElementById('history'),
-    editArea: document.getElementById('edit-area'),
-    noteInput: document.getElementById('note-input'),
-    translationSelect: document.getElementById('translation-select'),
-    fontSelect: document.getElementById('font-select'),
-    themeSelect: document.getElementById('theme-select'),
-    sizeRange: document.getElementById('size-range'),
-    settingsModal: document.getElementById('settings-modal'),
-    loading: document.getElementById('loading'),
-
-    // Song Mode Elements
-    modeBible: document.getElementById('mode-bible'),
-    modeSongs: document.getElementById('mode-songs'),
-    btnModeBible: document.getElementById('btn-mode-bible'),
-    btnModeSongs: document.getElementById('btn-mode-songs'),
-    songSearch: document.getElementById('song-search-input'),
-    songbookSelect: document.getElementById('songbook-select'),
-    songsList: document.getElementById('songs-list'),
-    songsCount: document.getElementById('songs-count'),
-    songPreviewText: document.getElementById('song-preview-text'),
-    btnBroadcastSong: document.getElementById('btn-broadcast-song'),
-    songModal: document.getElementById('song-modal'),
-    songFormId: document.getElementById('song-id'),
-    songFormNumber: document.getElementById('song-number'),
-    songFormTitle: document.getElementById('song-title'),
-    songFormText: document.getElementById('song-text')
-};
 
 // === INITIALIZATION ===
 async function init() {
@@ -100,11 +101,21 @@ async function init() {
         if (!dbs.KYB) missing.push('KYB');
 
         if (loadingStatus) {
-            loadingStatus.textContent = `Ошибка: ${missing.join(', ')}`;
-            loadingStatus.style.color = 'var(--error)';
+            loadingStatus.innerHTML = `⚠️ Ошибка загрузки Библии: ${missing.join(', ')}<br><span style="font-size: 12px; color: var(--text-tertiary);">Приложение продолжит работу с доступными модулями.</span>`;
+            loadingStatus.style.color = 'var(--warning)';
         }
-        return;
+
+        // Wait a brief moment so the user sees the warning, then proceed anyway
+        setTimeout(finalizeInit, 2000);
+    } else {
+        finalizeInit();
     }
+}
+
+// Expose finalizeInit to window for the "Skip" button in controller.html
+
+
+async function finalizeInit() {
 
     // Load Songbooks
     await loadSongbooks();
@@ -123,7 +134,25 @@ async function init() {
     // Load saved settings into UI
     const settings = loadSettings();
     elements.fontSelect.value = settings.font;
-    elements.themeSelect.value = settings.theme;
+    // Map legacy string themes to hex for the new color picker
+    let hexTheme = settings.theme;
+    if (hexTheme === 'blue') hexTheme = '#0f172a';
+    if (hexTheme === 'black') hexTheme = '#000000';
+    if (hexTheme === 'forest') hexTheme = '#052e16';
+
+    elements.themeSelect.value = hexTheme;
+    if (elements.themeHex) elements.themeHex.value = hexTheme;
+
+    // Load custom text color
+    const textColor = settings.textColor || '#ffffff';
+    if (elements.textColorSelect) elements.textColorSelect.value = textColor;
+    if (elements.textColorHex) elements.textColorHex.value = textColor;
+
+    // Run the injection logic once on startup so the controller previews the current save state
+    document.documentElement.style.setProperty('--text-color', textColor);
+    document.documentElement.style.setProperty('--accent-color', textColor);
+    if (settings.font) document.documentElement.style.setProperty('--font-main', settings.font);
+
     elements.sizeRange.value = settings.size;
 
     // Setup event listeners
@@ -131,6 +160,32 @@ async function init() {
 
     // Render initial history
     renderHistory(elements.historyList, loadFromHistory);
+
+    // Init UI Modules
+    initBibleUI(getDatabases, (verse) => {
+        state.currentVerse = verse;
+        displayPreview(verse);
+        addToHistory(verse);
+        renderHistory(elements.historyList, loadFromHistory);
+    }, (verse) => {
+        // Broadcast callback
+        broadcastToDisplay();
+    });
+
+    // Init Backgounds and broadcast active
+    try {
+        await initBgDB();
+        const activeBgId = getActiveBackgroundId();
+        if (activeBgId) {
+            const bgs = await loadBackgrounds();
+            const activeBg = bgs.find(b => b.id === activeBgId);
+            if (activeBg && typeof broadcastBackground === 'function') {
+                broadcastBackground(activeBg.dataUrl);
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to init backgrounds on startup:', e);
+    }
 }
 
 // === EVENT LISTENERS ===
@@ -150,83 +205,109 @@ function setupEventListeners() {
 
     // Settings changes
     elements.fontSelect.addEventListener('change', handleSettingsUpdate);
+
+    // Sync color picker with HEX input
+    elements.themeSelect.addEventListener('input', (e) => {
+        if (elements.themeHex) elements.themeHex.value = e.target.value;
+        handleSettingsUpdate();
+    });
     elements.themeSelect.addEventListener('change', handleSettingsUpdate);
+
+    if (elements.themeHex) {
+        elements.themeHex.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                elements.themeSelect.value = val;
+                handleSettingsUpdate();
+            }
+        });
+    }
+
+    // Sync Text Color picker with HEX input
+    if (elements.textColorSelect) {
+        elements.textColorSelect.addEventListener('input', (e) => {
+            if (elements.textColorHex) elements.textColorHex.value = e.target.value;
+            handleSettingsUpdate();
+        });
+        elements.textColorSelect.addEventListener('change', handleSettingsUpdate);
+    }
+
+    if (elements.textColorHex) {
+        elements.textColorHex.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                elements.textColorSelect.value = val;
+                handleSettingsUpdate();
+            }
+        });
+    }
+
     elements.sizeRange.addEventListener('input', handleSettingsUpdate);
+
+    // Note Input (Live Broadcast & Ctrl+Enter)
+    initNotesUI();
 
     // Mobile menu toggle
     setupMobileMenu();
 }
 
-// === MOBILE MENU ===
+// === UI TOGGLES (SIDEBAR & MENU) ===
 function setupMobileMenu() {
     const menuToggle = document.getElementById('menu-toggle');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const app = document.querySelector('.app');
 
     if (!menuToggle || !sidebar || !overlay) return;
 
     const toggleMenu = () => {
-        const isOpen = sidebar.classList.toggle('open');
-        overlay.classList.toggle('active', isOpen);
-        menuToggle.setAttribute('aria-expanded', isOpen);
-        menuToggle.textContent = isOpen ? '✕' : '☰';
+        if (window.innerWidth > 768) {
+            // Desktop toggle via CSS Grid
+            const isCollapsed = app.classList.toggle('sidebar-collapsed');
+            if (sidebarToggleBtn) {
+                sidebarToggleBtn.textContent = isCollapsed ? '▶' : '◀';
+            }
+        } else {
+            // Mobile toggle via off-canvas slide
+            const isOpen = sidebar.classList.toggle('open');
+            overlay.classList.toggle('active', isOpen);
+            menuToggle.setAttribute('aria-expanded', isOpen);
+            menuToggle.textContent = isOpen ? '✕' : '☰';
+        }
     };
 
     menuToggle.addEventListener('click', toggleMenu);
     overlay.addEventListener('click', toggleMenu);
 
+    // Sidebar Toggle
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', toggleMenu);
+        // Set initial icon state
+        sidebarToggleBtn.textContent = '◀';
+    }
+
     // Close on Escape
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+        if (e.key === 'Escape' && sidebar.classList.contains('open') && window.innerWidth <= 768) {
             toggleMenu();
+        }
+    });
+
+    // Clean up state on window resize
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) {
+            if (sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+                menuToggle.textContent = '☰';
+                menuToggle.setAttribute('aria-expanded', 'false');
+            }
         }
     });
 }
 
-// === SEARCH HANDLER ===
-async function handleSearch(e) {
-    if (e.key !== 'Enter') return;
-
-    const query = elements.input.value.trim();
-    if (!query) return;
-
-    updateStatus(elements.status, '⏳ Поиск...');
-
-    const translation = elements.translationSelect.value;
-    const db = getDatabases()[translation];
-    const ktbMap = translation === 'KTB' ? getKtbBookMap() : null;
-
-    const parsed = parseQuery(query);
-    if (!parsed) {
-        updateStatus(elements.status, '❌ Ошибка запроса', 'error');
-        return;
-    }
-
-    const data = fetchVerse(parsed, db, translation);
-
-    if (data) {
-        // Check for saved edits
-        const editedText = getEdit(translation, data.bookName, data.chapter, data.verse);
-        if (editedText) {
-            data.text = editedText;
-        }
-
-        currentVerse = data;
-        displayPreview(data);
-
-        updateStatus(elements.status, `✓ ${data.reference}`, 'success');
-        addToHistory(data);
-        renderHistory(elements.historyList, loadFromHistory);
-
-        // Ctrl+Enter broadcasts immediately
-        // Ctrl+Enter or Cmd+Enter broadcasts immediately
-        if (e.ctrlKey || e.metaKey) {
-            broadcastToDisplay();
-        }
-    } else {
-        updateStatus(elements.status, '❌ Не найдено', 'error');
-    }
-}
+// Bible Search is now handled entirely within bible-ui.js
 
 // === GLOBAL KEYBOARD SHORTCUTS ===
 function handleGlobalKeys(e) {
@@ -239,18 +320,21 @@ function handleGlobalKeys(e) {
         // Also close modals if open
         closeSongModal();
         closeTextSearch();
+        closePresentationModal();
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        if (currentMode === 'bible' && currentVerse) {
+        if (state.currentMode === 'bible' && state.currentVerse) {
             broadcastToDisplay();
-        } else if (currentMode === 'songs' && currentSong) {
+        } else if (state.currentMode === 'songs' && state.currentSong) {
             broadcastSong();
+        } else if (state.currentMode === 'slides' && state.currentPresentation) {
+            broadcastSlide();
         }
     }
 
     // Stanza navigation with arrows in song mode
-    if (!isTyping && currentMode === 'songs' && currentSong) {
+    if (!isTyping && state.currentMode === 'songs' && state.currentSong) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
             e.preventDefault();
             goToNextStanza();
@@ -261,9 +345,21 @@ function handleGlobalKeys(e) {
         }
     }
 
+    // Slide navigation with arrows
+    if (!isTyping && state.currentMode === 'slides' && state.currentPresentation) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            goToNextSlide();
+        }
+        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            goToPrevSlide();
+        }
+    }
+
     // Arrow navigation (only when not typing)
     if (!isTyping) {
-        if (currentMode === 'bible' && currentVerse) {
+        if (state.currentMode === 'bible' && state.currentVerse) {
             if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
                 e.preventDefault();
                 goToNextVerse();
@@ -278,7 +374,7 @@ function handleGlobalKeys(e) {
 
 // === TRANSLATION CHANGE ===
 async function handleTranslationChange(e) {
-    if (!currentVerse || !currentVerse.bookId) return;
+    if (!state.currentVerse || !state.currentVerse.bookId) return;
 
     const newTranslation = e.target.value;
     const db = getDatabases()[newTranslation];
@@ -286,10 +382,10 @@ async function handleTranslationChange(e) {
     updateStatus(elements.status, '⏳ Обновление...');
 
     const parsed = {
-        canonicalCode: currentVerse.canonicalCode,
-        chapter: currentVerse.chapter,
-        verse: currentVerse.verse,
-        bookName: currentVerse.bookName
+        canonicalCode: state.currentVerse.canonicalCode,
+        chapter: state.currentVerse.chapter,
+        verse: state.currentVerse.verse,
+        bookName: state.currentVerse.bookName
     };
 
     const data = fetchVerse(parsed, db, newTranslation);
@@ -300,7 +396,7 @@ async function handleTranslationChange(e) {
             data.text = editedText;
         }
 
-        currentVerse = data;
+        state.currentVerse = data;
         displayPreview(data);
         updateStatus(elements.status, `✓ ${data.reference} (${newTranslation})`, 'success');
         addToHistory(data);
@@ -324,11 +420,11 @@ function displayPreview(data) {
 }
 
 function broadcastToDisplay() {
-    if (!currentVerse) return;
+    if (!state.currentVerse) return;
 
     if (isDisplayAvailable()) {
-        showVerse(currentVerse);
-        updateStatus(elements.status, `📡 ${currentVerse.reference}`, 'broadcasting');
+        showVerse(state.currentVerse);
+        updateStatus(elements.status, `📡 ${state.currentVerse.reference}`, 'broadcasting');
     } else {
         updateStatus(elements.status, '⚠️ Откройте экран', 'error');
     }
@@ -341,115 +437,74 @@ function hideFromDisplay() {
 
 // === HISTORY ===
 function loadFromHistory(index) {
-    if (currentMode !== 'bible') switchMode('bible');
+    if (state.currentMode !== 'bible') switchMode('bible');
     const verse = getFromHistory(index);
     if (verse) {
-        currentVerse = verse;
+        state.currentVerse = verse;
         displayPreview(verse);
         broadcastToDisplay();
     }
 }
 
-// === VERSE NAVIGATION ===
-function goToNextVerse() {
-    if (!currentVerse) return;
-
-    const translation = elements.translationSelect.value;
-    const db = getDatabases()[translation];
-
-    const nextVerse = getNextVerse(currentVerse, db, translation);
-    if (nextVerse) {
-        // Check for saved edits
-        const editedText = getEdit(translation, nextVerse.bookName, nextVerse.chapter, nextVerse.verse);
-        if (editedText) {
-            nextVerse.text = editedText;
-        }
-
-        currentVerse = nextVerse;
-        displayPreview(nextVerse);
-        addToHistory(nextVerse);
-        renderHistory(elements.historyList, loadFromHistory);
-        updateStatus(elements.status, `✓ ${nextVerse.reference}`, 'success');
-
-        // Auto-broadcast if we were already broadcasting
-        if (isDisplayAvailable()) {
-            broadcastToDisplay();
-        }
-    } else {
-        updateStatus(elements.status, '⚠️ Конец', 'error');
-    }
-}
-
-function goToPrevVerse() {
-    if (!currentVerse) return;
-
-    const translation = elements.translationSelect.value;
-    const db = getDatabases()[translation];
-
-    const prevVerse = getPrevVerse(currentVerse, db, translation);
-    if (prevVerse) {
-        // Check for saved edits
-        const editedText = getEdit(translation, prevVerse.bookName, prevVerse.chapter, prevVerse.verse);
-        if (editedText) {
-            prevVerse.text = editedText;
-        }
-
-        currentVerse = prevVerse;
-        displayPreview(prevVerse);
-        addToHistory(prevVerse);
-        renderHistory(elements.historyList, loadFromHistory);
-        updateStatus(elements.status, `✓ ${prevVerse.reference}`, 'success');
-
-        // Auto-broadcast if we were already broadcasting
-        if (isDisplayAvailable()) {
-            broadcastToDisplay();
-        }
-    } else {
-        updateStatus(elements.status, '⚠️ Начало', 'error');
-    }
-}
+// Verse Navigation was extracted to bible-ui.js
 
 // Global bindings for HTML onclick
-window.goToNextVerse = goToNextVerse;
-window.goToPrevVerse = goToPrevVerse;
 
-// === NOTES ===
-window.showNote = function () {
-    const text = elements.noteInput.value.trim();
-    if (!text) return;
 
-    if (isDisplayAvailable()) {
-        showNote(text);
-        updateStatus(elements.status, '📡 ЗАМЕТКА', 'broadcasting');
-    } else {
-        updateStatus(elements.status, '⚠️ Откройте экран', 'error');
-    }
-};
+
+// === VISUAL BIBLE NAVIGATION ===
+// Visual Bible Navigation was extracted to bible-ui.js
+
+// Notes logic was extracted to notes-ui.js
 
 // === SETTINGS ===
-window.toggleSettings = function () {
+function toggleSettings() {
     elements.settingsModal.classList.toggle('active');
+
+    // Auto-close mobile sidebar if it is open so the modal doesn't trigger behind it
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+
+        if (sidebar && sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('active');
+            if (menuToggle) {
+                menuToggle.textContent = '☰';
+                menuToggle.setAttribute('aria-expanded', 'false');
+            }
+        }
+    }
 };
 
 function handleSettingsUpdate() {
     const settings = {
         font: elements.fontSelect.value,
         theme: elements.themeSelect.value,
+        textColor: elements.textColorSelect ? elements.textColorSelect.value : '#ffffff',
         size: elements.sizeRange.value
     };
+
+    // Immediately map the new Settings into the Controller's CSS so the local Preview Box matches the Display Monitor
+    document.documentElement.style.setProperty('--text-color', settings.textColor);
+    document.documentElement.style.setProperty('--accent-color', settings.textColor);
+
+    // Apply local root font scaling
+    if (settings.font) document.documentElement.style.setProperty('--font-main', settings.font);
 
     saveSettings(settings);
     updateDisplaySettings(settings);
 }
 
-window.updateSettings = handleSettingsUpdate;
+
 
 // === EDIT MODE ===
-window.toggleEditMode = function () {
-    if (!currentVerse) return;
+function toggleEditMode() {
+    if (!state.currentVerse) return;
 
     elements.verseText.style.display = 'none';
-    elements.editArea.value = currentVerse.text;
+    elements.editArea.value = state.currentVerse.text;
     elements.editArea.classList.add('active');
     document.getElementById('btn-edit').style.display = 'none';
     document.getElementById('btn-save').style.display = 'inline-flex';
@@ -457,7 +512,7 @@ window.toggleEditMode = function () {
     elements.editArea.focus();
 };
 
-window.cancelEdit = function () {
+function cancelEdit() {
     elements.verseText.style.display = 'block';
     elements.editArea.classList.remove('active');
     document.getElementById('btn-edit').style.display = 'flex';
@@ -465,14 +520,14 @@ window.cancelEdit = function () {
     document.getElementById('btn-cancel').style.display = 'none';
 };
 
-window.saveEdit = function () {
-    if (!currentVerse) return;
+function saveVerseEdit() {
+    if (!state.currentVerse) return;
 
-    currentVerse.text = elements.editArea.value.trim();
+    state.currentVerse.text = elements.editArea.value.trim();
     const translation = elements.translationSelect.value;
-    saveEdit(translation, currentVerse.bookName, currentVerse.chapter, currentVerse.verse, currentVerse.text);
-    displayPreview(currentVerse);
-    window.cancelEdit();
+    saveEdit(translation, state.currentVerse.bookName, state.currentVerse.chapter, state.currentVerse.verse, state.currentVerse.text);
+    displayPreview(state.currentVerse);
+    cancelEdit();
 
     if (elements.status.classList.contains('broadcasting')) {
         broadcastToDisplay();
@@ -480,7 +535,7 @@ window.saveEdit = function () {
 };
 
 // === DISPLAY WINDOW ===
-window.openDisplayWindow = async function () {
+async function launchDisplayWindow() {
     const win = await openDisplayWindow();
     setDisplayWindow(win);
 
@@ -489,25 +544,29 @@ window.openDisplayWindow = async function () {
 };
 
 // === HISTORY CLEAR ===
-window.clearHistory = function () {
+function clearHistory() {
     clearHistoryData();
     renderHistory(elements.historyList, loadFromHistory);
 };
 
 
 // === SONG MODE LOGIC ===
-window.switchMode = function (mode) {
-    if (mode === currentMode) return;
+function switchMode(mode) {
+    if (mode === state.currentMode) return;
 
-    currentMode = mode;
+    state.currentMode = mode;
 
     // Toggle Buttons
     elements.btnModeBible.classList.toggle('active', mode === 'bible');
     elements.btnModeSongs.classList.toggle('active', mode === 'songs');
+    elements.btnModeSlides.classList.toggle('active', mode === 'slides');
+    elements.btnModeBackgrounds.classList.toggle('active', mode === 'backgrounds');
 
     // Toggle Content
     elements.modeBible.style.display = mode === 'bible' ? 'block' : 'none';
     elements.modeSongs.style.display = mode === 'songs' ? 'block' : 'none';
+    elements.modeSlides.style.display = mode === 'slides' ? 'block' : 'none';
+    elements.modeBackgrounds.style.display = mode === 'backgrounds' ? 'flex' : 'none';
 
     // Toggle History sidebar section (only relevant for Bible mode)
     const historySection = document.getElementById('history-section');
@@ -518,391 +577,14 @@ window.switchMode = function (mode) {
     if (mode === 'songs') {
         renderSongList(elements.songSearch.value, elements.songbookSelect.value);
         elements.songSearch.focus();
+    } else if (mode === 'slides') {
+        renderPresentationList();
+    } else if (mode === 'backgrounds') {
+        renderBackgroundList();
     } else {
         elements.input.focus();
     }
 };
-
-window.openAddSongModal = function () {
-    elements.songFormId.value = '';
-    elements.songFormNumber.value = '';
-    elements.songFormTitle.value = '';
-    elements.songFormText.value = '';
-
-    document.getElementById('song-modal-title').textContent = '🎵 Добавить песню';
-    elements.songModal.classList.add('active');
-    elements.songFormNumber.focus();
-};
-
-window.closeSongModal = function () {
-    elements.songModal.classList.remove('active');
-};
-
-window.saveSongForm = function () {
-    const number = elements.songFormNumber.value.trim();
-    const title = elements.songFormTitle.value.trim();
-    const text = elements.songFormText.value.trim();
-    const id = elements.songFormId.value;
-
-    if (!title || !text) {
-        alert('Введите название и текст песни');
-        return;
-    }
-
-    saveSong({ id, number, title, text });
-
-    // Refresh list
-    renderSongList(elements.songSearch.value, elements.songbookSelect.value);
-
-    closeSongModal();
-};
-
-window.editCurrentSong = function () {
-    if (!currentSong) return;
-
-    elements.songFormId.value = currentSong.id;
-    elements.songFormNumber.value = currentSong.number;
-    elements.songFormTitle.value = currentSong.title;
-    elements.songFormText.value = currentSong.text;
-
-    document.getElementById('song-modal-title').textContent = '✏️ Редактировать песню';
-    elements.songModal.classList.add('active');
-};
-
-function handleSongSearch(e) {
-    const query = e.target.value;
-    const bookId = elements.songbookSelect.value;
-    renderSongList(query, bookId);
-}
-
-function handleSongbookChange() {
-    const query = elements.songSearch.value;
-    const bookId = elements.songbookSelect.value;
-    renderSongList(query, bookId);
-}
-
-function populateSongbookSelector() {
-    const books = getSongbooks();
-    // Keep the default 'all' option, add each book
-    books.forEach(book => {
-        const option = document.createElement('option');
-        option.value = book.id;
-        option.textContent = book.title;
-        elements.songbookSelect.appendChild(option);
-    });
-}
-
-function renderSongList(query = '', bookId = 'all') {
-    const songs = searchSongs(query, bookId);
-
-    elements.songsCount.textContent = `${songs.length} песен`;
-    elements.songsList.innerHTML = '';
-
-    if (songs.length === 0) {
-        elements.songsList.innerHTML = '<div style="padding: 20px; color: var(--text-tertiary); text-align: center;">Нет песен</div>';
-        return;
-    }
-
-    // Sort by song number (numeric if possible) then alpha
-    songs.sort((a, b) => {
-        const numA = parseInt(a.number);
-        const numB = parseInt(b.number);
-        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-        return a.title.localeCompare(b.title);
-    });
-
-    songs.forEach(song => {
-        const div = document.createElement('div');
-        div.className = 'song-item';
-        if (currentSong && currentSong.id === song.id) div.classList.add('active');
-
-        const headerRow = document.createElement('div');
-        headerRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center;';
-
-        const numberSpan = document.createElement('span');
-        numberSpan.className = 'song-number';
-        numberSpan.textContent = song.number ? '№' + song.number : '';
-        headerRow.appendChild(numberSpan);
-
-        // Only show delete button for user-created songs
-        if (song.bookId === 'user') {
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn-icon';
-            deleteBtn.style.cssText = 'width:28px; height:28px; font-size:14px; border:none; opacity:0.4;';
-            deleteBtn.textContent = '🗑';
-            deleteBtn.title = 'Удалить';
-            deleteBtn.onclick = (e) => { e.stopPropagation(); confirmDeleteSong(song); };
-            headerRow.appendChild(deleteBtn);
-        }
-
-        const titleDiv = document.createElement('div');
-        titleDiv.className = 'song-title';
-        titleDiv.textContent = song.title;
-
-        const previewDiv = document.createElement('div');
-        previewDiv.className = 'song-preview';
-        previewDiv.textContent = (song.text.split('\n')[0] || '') + '...';
-
-        div.appendChild(headerRow);
-        div.appendChild(titleDiv);
-        div.appendChild(previewDiv);
-
-        div.onclick = () => selectSong(song);
-        elements.songsList.appendChild(div);
-    });
-}
-
-function selectSong(song) {
-    currentSong = song;
-
-    // Parse stanzas
-    currentStanzas = parseSongStanzas(song);
-    currentStanzaIndex = 0;
-
-    renderSongList(elements.songSearch.value, elements.songbookSelect.value);
-
-    // Render song text with verse separation
-    renderSongPreview(song);
-    elements.songPreviewText.classList.remove('placeholder');
-    elements.btnBroadcastSong.disabled = false;
-
-    // Scroll active song into view in the list
-    const activeItem = elements.songsList.querySelector('.song-item.active');
-    if (activeItem) {
-        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-}
-
-/**
- * Parse song text into stanzas with labels
- */
-function parseSongStanzas(song) {
-    const rawStanzas = song.text.split('\n\n');
-    let verseNum = 0;
-    const chorusTracker = new Set();
-    const result = [];
-
-    rawStanzas.forEach(stanza => {
-        const trimmed = stanza.trim();
-        if (!trimmed) return;
-
-        const isChorus = chorusTracker.has(trimmed);
-        if (!isChorus) {
-            chorusTracker.add(trimmed);
-        }
-
-        if (!isChorus) verseNum++;
-
-        result.push({
-            text: trimmed,
-            label: isChorus ? 'Припев' : `Куплет ${verseNum}`,
-            isChorus
-        });
-    });
-
-    return result;
-}
-
-/**
- * Render song text with visually separated verses/choruses
- */
-function renderSongPreview(song) {
-    const container = elements.songPreviewText;
-    container.innerHTML = '';
-
-    currentStanzas.forEach((stanza, idx) => {
-        const block = document.createElement('div');
-        block.className = 'song-stanza ' + (stanza.isChorus ? 'chorus' : 'verse');
-        if (idx === currentStanzaIndex) block.classList.add('active');
-
-        // Clickable to jump to stanza
-        block.style.cursor = 'pointer';
-        block.addEventListener('click', () => {
-            currentStanzaIndex = idx;
-            highlightActiveStanza();
-            broadcastCurrentStanza();
-        });
-
-        // Add label
-        const label = document.createElement('div');
-        label.className = 'stanza-label';
-        label.textContent = stanza.label;
-        block.appendChild(label);
-
-        // Add text lines
-        const textDiv = document.createElement('div');
-        textDiv.className = 'stanza-text';
-        textDiv.innerHTML = escapeHtmlForPreview(stanza.text).replace(/\n/g, '<br>');
-        block.appendChild(textDiv);
-
-        container.appendChild(block);
-    });
-}
-
-/**
- * Highlight the active stanza in the preview
- */
-function highlightActiveStanza() {
-    const blocks = elements.songPreviewText.querySelectorAll('.song-stanza');
-    blocks.forEach((block, idx) => {
-        block.classList.toggle('active', idx === currentStanzaIndex);
-    });
-    // Scroll active stanza into view
-    const activeBlock = blocks[currentStanzaIndex];
-    if (activeBlock) {
-        activeBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-}
-
-/**
- * Broadcast only the current stanza to display
- */
-function broadcastCurrentStanza() {
-    if (!currentSong || !currentStanzas.length) return;
-    const stanza = currentStanzas[currentStanzaIndex];
-    if (!stanza) return;
-
-    // Always try to show song (handles BroadcastChannel + Window)
-    const success = showSong({
-        title: currentSong.title,
-        number: currentSong.number,
-        text: stanza.text,
-        stanzaLabel: stanza.label,
-        stanzaIndex: currentStanzaIndex + 1,
-        stanzaTotal: currentStanzas.length
-    });
-
-    const label = stanza.label;
-    if (success || isDisplayAvailable()) {
-        updateStatus(elements.status, `🎵 ${currentSong.number ? '#' + currentSong.number + ' ' : ''}${currentSong.title} — ${label}`, 'broadcasting');
-    } else {
-        // Even if showSong returns false (no window), we might have sent via channel.
-        // We'll assume success if we are in a context where channel works, but show warning if strict.
-        // For now, let's show broadcasting status but maybe with a warning if window missing?
-        // Actually, sendToDisplay returns false if window missing.
-        // But we want to indicate it "Sent to Network".
-        updateStatus(elements.status, `📡 ${label} >> Эфир`, 'broadcasting');
-    }
-}
-
-/**
- * Safe HTML escape for song preview
- */
-function escapeHtmlForPreview(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-/**
- * Navigate to next stanza, or next song if at the end
- */
-function goToNextStanza() {
-    if (!currentSong || !currentStanzas.length) return;
-    if (currentStanzaIndex < currentStanzas.length - 1) {
-        currentStanzaIndex++;
-        highlightActiveStanza();
-        broadcastCurrentStanza();
-    } else {
-        // Move to next song
-        const songs = getCurrentSongList();
-        const idx = songs.findIndex(s => s.id === currentSong.id);
-        if (idx < songs.length - 1) {
-            selectSong(songs[idx + 1]);
-            broadcastCurrentStanza();
-        }
-    }
-}
-
-/**
- * Navigate to previous stanza, or previous song if at the start
- */
-function goToPrevStanza() {
-    if (!currentSong || !currentStanzas.length) return;
-    if (currentStanzaIndex > 0) {
-        currentStanzaIndex--;
-        highlightActiveStanza();
-        broadcastCurrentStanza();
-    } else {
-        // Move to previous song (last stanza)
-        const songs = getCurrentSongList();
-        const idx = songs.findIndex(s => s.id === currentSong.id);
-        if (idx > 0) {
-            selectSong(songs[idx - 1]);
-            currentStanzaIndex = currentStanzas.length - 1;
-            highlightActiveStanza();
-            broadcastCurrentStanza();
-        }
-    }
-}
-
-/**
- * Navigate to next song in the currently displayed list
- */
-function goToNextSong() {
-    const songs = getCurrentSongList();
-    if (!songs.length || !currentSong) return;
-    const idx = songs.findIndex(s => s.id === currentSong.id);
-    if (idx < songs.length - 1) {
-        selectSong(songs[idx + 1]);
-    }
-}
-
-/**
- * Navigate to previous song in the currently displayed list
- */
-function goToPrevSong() {
-    const songs = getCurrentSongList();
-    if (!songs.length || !currentSong) return;
-    const idx = songs.findIndex(s => s.id === currentSong.id);
-    if (idx > 0) {
-        selectSong(songs[idx - 1]);
-    }
-}
-
-/**
- * Get the current filtered and sorted song list
- */
-function getCurrentSongList() {
-    const query = elements.songSearch.value;
-    const bookId = elements.songbookSelect.value;
-    const songs = searchSongs(query, bookId);
-    songs.sort((a, b) => {
-        const numA = parseInt(a.number);
-        const numB = parseInt(b.number);
-        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-        return a.title.localeCompare(b.title);
-    });
-    return songs;
-}
-
-window.broadcastSong = function () {
-    if (!currentSong) return;
-    broadcastCurrentStanza();
-};
-
-window.goToNextSong = goToNextSong;
-window.goToPrevSong = goToPrevSong;
-window.goToNextStanza = goToNextStanza;
-window.goToPrevStanza = goToPrevStanza;
-
-function confirmDeleteSong(song) {
-    if (!confirm(`Удалить песню "${song.title}"?`)) return;
-
-    deleteSong(song.id);
-
-    // Clear selection if deleted song was selected
-    if (currentSong && currentSong.id === song.id) {
-        currentSong = null;
-        elements.songPreviewText.textContent = 'Выберите песню из списка';
-        elements.songPreviewText.classList.add('placeholder');
-        elements.btnBroadcastSong.disabled = true;
-    }
-
-    renderSongList(elements.songSearch.value, elements.songbookSelect.value);
-}
-
-
 // === REGISTER SERVICE WORKER ===
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
@@ -910,108 +592,589 @@ if ('serviceWorker' in navigator) {
         .catch(err => console.log('❌ Service Worker ошибка:', err));
 }
 
-// === GLOBAL BINDINGS ===
-// Required for onclick handlers in HTML
-window.broadcastToDisplay = function () {
-    if (!currentVerse) return;
+// === END OF GLOBAL BINDINGS ===
 
-    if (isDisplayAvailable()) {
-        showVerse(currentVerse);
-        updateStatus(elements.status, `📡 ${currentVerse.reference}`, 'broadcasting');
-    } else {
-        updateStatus(elements.status, '⚠️ Откройте экран', 'error');
-    }
-};
+// === PRESENTATION MODE LOGIC ===
 
-window.hideFromDisplay = function () {
-    hideDisplay();
-    updateStatus(elements.status, '⏳ Готов');
-};
+/**
+ * Open the create presentation modal
+ */
+function openCreatePresentationModal() {
+    state.pendingSlides = [];
+    elements.presTitle.value = '';
+    elements.uploadPreviewGrid.innerHTML = '';
+    elements.presentationModal.classList.add('active');
 
-// === TEXT SEARCH ===
-window.openTextSearch = function () {
-    const modal = document.getElementById('text-search-modal');
-    const input = document.getElementById('text-search-input');
-    modal.classList.add('active');
-    input.value = '';
-    input.focus();
+    // Setup drag & drop
+    const dropZone = elements.slideDropZone;
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
+    dropZone.ondragleave = () => dropZone.classList.remove('dragover');
+    dropZone.ondrop = async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length) await handleSlideFiles(files);
+    };
 
-    // Setup search on Enter
-    input.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-            performTextSearch();
-        }
+    // Setup file input
+    elements.slideFileInput.value = '';
+    elements.slideFileInput.onchange = async (e) => {
+        if (e.target.files.length) await handleSlideFiles(e.target.files);
     };
 };
 
-window.closeTextSearch = function () {
-    const modal = document.getElementById('text-search-modal');
-    const modalResults = document.getElementById('text-search-results');
-    modalResults.innerHTML = '<div class="search-results-placeholder" style="color: var(--text-tertiary); text-align: center; padding: 40px;">Введите текст и нажмите Enter</div>';
-    modal.classList.remove('active');
+/**
+ * Close the create presentation modal
+ */
+function closePresentationModal() {
+    elements.presentationModal.classList.remove('active');
+    state.pendingSlides = [];
 };
 
-function performTextSearch() {
-    const query = document.getElementById('text-search-input').value.trim();
-    if (!query) return;
+/**
+ * Handle files dropped or selected
+ */
+async function handleSlideFiles(files) {
+    const status = elements.uploadStatus;
+    status.style.display = 'block';
+    status.textContent = 'Обработка файлов...';
 
-    const translation = elements.translationSelect.value;
-    const db = getDatabases()[translation];
+    try {
+        const newSlides = await processFiles(files, (msg) => {
+            status.textContent = msg;
+        });
+        state.pendingSlides.push(...newSlides);
+        renderUploadPreview();
+        status.textContent = state.pendingSlides.length > 0
+            ? `${state.pendingSlides.length} слайд(ов) готово`
+            : '';
+    } catch (e) {
+        status.textContent = 'Ошибка обработки файлов';
+        console.error(e);
+    }
 
-    const results = fullTextSearch(query, db, translation, 30);
-    renderSearchResults(results, query);
+    setTimeout(() => { status.style.display = 'none'; }, 2000);
 }
 
-function renderSearchResults(results, query) {
-    const container = document.getElementById('text-search-results');
-    const countEl = document.getElementById('text-search-count');
+/**
+ * Render upload preview thumbnails in modal
+ */
+function renderUploadPreview() {
+    const grid = elements.uploadPreviewGrid;
+    grid.innerHTML = '';
 
-    // Clear previous results
-    container.innerHTML = '';
-    countEl.textContent = `Найдено: ${results.length}`;
+    state.pendingSlides.forEach((slide, index) => {
+        const item = document.createElement('div');
+        item.className = 'upload-preview-item';
 
-    if (results.length === 0) {
-        const placeholder = document.createElement('div');
-        placeholder.style.cssText = 'color: var(--text-tertiary); text-align: center; padding: 40px;';
-        placeholder.textContent = 'Ничего не найдено';
-        container.appendChild(placeholder);
+        const img = document.createElement('img');
+        img.src = slide.thumbnailDataUrl;
+        img.alt = `Slide ${index + 1}`;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '✕';
+        removeBtn.onclick = () => {
+            state.pendingSlides.splice(index, 1);
+            renderUploadPreview();
+        };
+
+        item.appendChild(img);
+        item.appendChild(removeBtn);
+        grid.appendChild(item);
+    });
+}
+
+/**
+ * Save a new presentation from the modal form
+ */
+async function savePresentationForm() {
+    const title = elements.presTitle.value.trim();
+    if (!title) {
+        elements.presTitle.focus();
+        return;
+    }
+    if (state.pendingSlides.length === 0) {
+        alert('Добавьте хотя бы одно изображение');
         return;
     }
 
-    results.forEach((verse, index) => {
-        const item = document.createElement('div');
-        item.className = 'search-result-item';
-        item.dataset.index = index;
+    // Re-index slide orders
+    state.pendingSlides.forEach((s, i) => s.order = i);
+    const category = document.getElementById('pres-category').value || 'sermons';
 
-        const refDiv = document.createElement('div');
-        refDiv.className = 'search-result-ref';
-        refDiv.textContent = verse.reference; // Safe: textContent
-
-        const textDiv = document.createElement('div');
-        textDiv.className = 'search-result-text';
-        textDiv.innerHTML = verse.text; // Safe: innerHTML for formatting
-
-        item.appendChild(refDiv);
-        item.appendChild(textDiv);
-        container.appendChild(item);
+    await savePresentation({
+        title,
+        category,
+        slides: state.pendingSlides
     });
 
-    // Event delegation for clicks
-    container.onclick = (e) => {
-        const item = e.target.closest('.search-result-item');
-        if (item && item.dataset.index !== undefined) {
-            const verse = results[Number(item.dataset.index)];
-            if (verse) {
-                currentVerse = verse;
-                displayPreview(verse);
-                addToHistory(verse);
-                renderHistory(elements.historyList, loadFromHistory);
-                closeTextSearch();
-                updateStatus(elements.status, `✓ ${verse.reference}`, 'success');
-            }
+    closePresentationModal();
+    await renderPresentationList();
+};
+
+/**
+ * Render the list of presentations in the sidebar
+ */
+
+async function renderPresentationList() {
+    const list = elements.presentationsList;
+    list.innerHTML = '';
+
+    try {
+        await initDB();
+        let presentations = await loadPresentations();
+
+        const filterEl = document.getElementById('pres-category-filter');
+        const filterVal = filterEl ? filterEl.value : 'sermons';
+
+        // Filter based on selected tab
+        if (filterVal === 'trash') {
+            presentations = presentations.filter(p => !!p.deletedAt);
+        } else {
+            presentations = presentations.filter(p => !p.deletedAt && p.category === filterVal);
         }
-    };
+
+        elements.slidesCount.textContent = `${presentations.length}`;
+
+        if (presentations.length === 0) {
+            if (filterVal === 'trash') {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-tertiary);">Корзина пуста</div>';
+            } else {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-tertiary);">Нет презентаций.<br>Нажмите ➕ Создать</div>';
+            }
+            return;
+        }
+
+        presentations.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'pres-list-item' + (state.currentPresentation && state.currentPresentation.id === p.id ? ' active' : '');
+
+            let thumbHtml = '';
+            if (p.firstThumbnail) {
+                thumbHtml = `<img class="pres-list-thumb" src="${p.firstThumbnail}" alt="">`;
+            } else {
+                thumbHtml = '<div class="pres-list-thumb"></div>';
+            }
+
+            let actionsHtml = '';
+            if (filterVal === 'trash') {
+                actionsHtml = `
+                    <button class="btn-icon pres-restore-btn" title="Восстановить" style="font-size: 16px; opacity: 0.8; margin-right: 4px;">♻️</button>
+                    <button class="btn-icon pres-harddelete-btn" title="Удалить навсегда" style="font-size: 16px; opacity: 0.8; color: var(--error);">🗑️</button>
+                `;
+            } else {
+                actionsHtml = `<button class="btn-icon pres-delete-btn" title="Удалить" style="font-size: 16px; opacity: 0.5; flex-shrink: 0;">🗑️</button>`;
+            }
+
+            item.innerHTML = `
+                ${thumbHtml}
+                <div class="pres-list-info" style="flex: 1; cursor: pointer;">
+                    <div class="pres-list-title">${p.title}</div>
+                    <div class="pres-list-meta">${p.slideCount} слайд(ов)</div>
+                </div>
+                <div style="display: flex; flex-shrink: 0;">${actionsHtml}</div>
+            `;
+
+            const infoArea = item.querySelector('.pres-list-info');
+            const thumbArea = item.querySelector('.pres-list-thumb');
+
+            if (filterVal !== 'trash') {
+                // Normal click triggers preview
+                infoArea.onclick = () => selectPresentation(p.id);
+                if (thumbArea) thumbArea.onclick = () => selectPresentation(p.id);
+                if (thumbArea) thumbArea.style.cursor = 'pointer';
+
+                const deleteBtn = item.querySelector('.pres-delete-btn');
+                deleteBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    await deletePresentation(p.id);
+                    if (state.currentPresentation && state.currentPresentation.id === p.id) {
+                        state.currentPresentation = null;
+                        state.currentSlideIndex = 0;
+                        elements.slidePreviewPlaceholder.style.display = 'block';
+                        elements.slidePreviewImg.style.display = 'none';
+                        elements.slideThumbnails.innerHTML = '';
+                        elements.slideCounter.textContent = '';
+                        elements.btnBroadcastSlide.disabled = true;
+                    }
+                    await renderPresentationList();
+                };
+            } else {
+                // In trash
+                const restoreBtn = item.querySelector('.pres-restore-btn');
+                if (restoreBtn) {
+                    restoreBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        await window.restorePresentationFromTrash(p.id);
+                    };
+                }
+                const hardDelBtn = item.querySelector('.pres-harddelete-btn');
+                if (hardDelBtn) {
+                    hardDelBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        if (confirm('Презентация будет удалена навсегда. Продолжить?')) {
+                            await window.hardDeletePresentationFromTrash(p.id);
+                        }
+                    };
+                }
+            }
+
+            list.appendChild(item);
+        });
+    } catch (e) {
+        console.error('Failed to load presentations:', e);
+        list.innerHTML = '<div style="padding: 20px; color: var(--text-tertiary);">Ошибка загрузки</div>';
+    }
 }
 
+/**
+ * Select a presentation and load it
+ */
+async function selectPresentation(id) {
+    try {
+        if (state.currentPresentation && state.currentPresentation.slides) {
+            state.currentPresentation.slides.forEach(s => {
+                if (s._blobUrl) URL.revokeObjectURL(s._blobUrl);
+            });
+        }
+        state.currentPresentation = await getPresentation(id);
+        if (!state.currentPresentation || !state.currentPresentation.slides.length) return;
+
+        state.currentSlideIndex = 0;
+        renderCurrentSlide();
+        renderSlideThumbnails();
+        renderPresentationList(); // Update active state
+        elements.btnBroadcastSlide.disabled = false;
+    } catch (e) {
+        console.error('Failed to load presentation:', e);
+    }
+}
+
+/**
+ * Render the currently selected slide in the preview area
+ */
+function getSlideUrl(slide) {
+    if (slide.imageBlob) {
+        if (!slide._blobUrl) {
+            slide._blobUrl = URL.createObjectURL(slide.imageBlob);
+        }
+        return slide._blobUrl;
+    }
+    return slide.imageDataUrl;
+}
+
+/**
+ * Render the currently selected slide in the preview area
+ */
+function renderCurrentSlide() {
+    if (!state.currentPresentation || !state.currentPresentation.slides.length) return;
+
+    const slide = state.currentPresentation.slides[state.currentSlideIndex];
+    elements.slidePreviewPlaceholder.style.display = 'none';
+    elements.slidePreviewImg.style.display = 'block';
+    elements.slidePreviewImg.src = getSlideUrl(slide);
+    elements.slideCounter.textContent = `${state.currentSlideIndex + 1} / ${state.currentPresentation.slides.length}`;
+
+    // Update thumbnail active state
+    const thumbs = elements.slideThumbnails.querySelectorAll('.slide-thumb');
+    thumbs.forEach((t, i) => t.classList.toggle('active', i === state.currentSlideIndex));
+}
+
+/**
+ * Render slide thumbnails strip
+ */
+function renderSlideThumbnails() {
+    const container = elements.slideThumbnails;
+    container.innerHTML = '';
+
+    if (!state.currentPresentation) return;
+
+    state.currentPresentation.slides.forEach((slide, index) => {
+        const img = document.createElement('img');
+        img.className = 'slide-thumb' + (index === state.currentSlideIndex ? ' active' : '');
+        img.src = slide.thumbnailDataUrl;
+        img.alt = `Slide ${index + 1}`;
+        img.onclick = () => {
+            state.currentSlideIndex = index;
+            renderCurrentSlide();
+        };
+        container.appendChild(img);
+    });
+}
+
+/**
+ * Navigate slides
+ */
+function goToNextSlide() {
+    if (!state.currentPresentation) return;
+    if (state.currentSlideIndex < state.currentPresentation.slides.length - 1) {
+        state.currentSlideIndex++;
+        renderCurrentSlide();
+        broadcastSlide();
+    }
+};
+
+function goToPrevSlide() {
+    if (!state.currentPresentation) return;
+    if (state.currentSlideIndex > 0) {
+        state.currentSlideIndex--;
+        renderCurrentSlide();
+        broadcastSlide();
+    }
+};
+
+/**
+ * Broadcast current slide to display
+ */
+function broadcastSlide() {
+    if (!state.currentPresentation || !state.currentPresentation.slides.length) return;
+    const slide = state.currentPresentation.slides[state.currentSlideIndex];
+    showSlide({
+        imageBlob: slide.imageBlob,
+        imageUrl: slide.imageDataUrl // fallback for old presentations
+    });
+};
+
+/**
+ * Delete the currently selected presentation
+ */
+async function deleteCurrentPresentation() {
+    if (!state.currentPresentation) return;
+
+    await deletePresentation(state.currentPresentation.id);
+    state.currentPresentation = null;
+    state.currentSlideIndex = 0;
+
+    // Reset preview
+    elements.slidePreviewPlaceholder.style.display = 'block';
+    elements.slidePreviewImg.style.display = 'none';
+    elements.slideThumbnails.innerHTML = '';
+    elements.slideCounter.textContent = '';
+    elements.btnBroadcastSlide.disabled = true;
+
+    await renderPresentationList();
+};
+
+// === BACKGROUNDS LOGIC ===
+
+async function renderBackgroundList() {
+    const list = elements.bgGallery;
+    list.innerHTML = '';
+
+    try {
+        await initBgDB();
+        const bgs = await loadBackgrounds();
+        elements.bgCount.textContent = bgs.length;
+
+        if (bgs.length === 0) {
+            list.innerHTML = '<div style="grid-column: 1 / -1; padding: 20px; text-align: center; color: var(--text-tertiary);">Нет загруженных фонов</div>';
+            return;
+        }
+
+        const activeId = getActiveBackgroundId();
+
+        bgs.forEach(bg => {
+            const item = document.createElement('div');
+            const isActive = activeId === bg.id;
+
+            item.className = 'bg-gallery-item' + (isActive ? ' active' : '');
+            // We use background-image for the thumbnail
+            item.innerHTML = `
+                <div class="bg-gallery-thumb" style="background-image: url('${bg.dataUrl}'); cursor: pointer;">
+                    ${isActive ? '<div class="bg-active-badge">✔️ Активно</div>' : ''}
+                </div>
+                <div class="bg-gallery-info">
+                    <span class="bg-gallery-name" title="${bg.name}">${bg.name}</span>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn-icon bg-set-btn" title="${isActive ? 'Убрать с экрана' : 'Показать на экране'}" style="color: ${isActive ? 'var(--accent)' : 'inherit'};">🖥️</button>
+                        <button class="btn-icon bg-delete-btn" title="Удалить фон">🗑️</button>
+                    </div>
+                </div>
+            `;
+
+            // Select background via thumbnail or button
+            const thumb = item.querySelector('.bg-gallery-thumb');
+            const setBtn = item.querySelector('.bg-set-btn');
+            thumb.onclick = () => selectBackground(bg.id);
+            setBtn.onclick = (e) => {
+                e.stopPropagation();
+                selectBackground(bg.id);
+            };
+
+            // Delete background
+            const delBtn = item.querySelector('.bg-delete-btn');
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (confirm('Удалить этот фон?')) {
+                    await deleteBackground(bg.id);
+                    await renderBackgroundList();
+                    // If active was deleted, notify broadcast to reset
+                    if (isActive) {
+                        broadcastBackground(null);
+                    }
+                }
+            };
+
+            list.appendChild(item);
+        });
+    } catch (e) {
+        console.error('Failed to load backgrounds:', e);
+        list.innerHTML = '<div style="grid-column: 1 / -1; padding: 20px; color: var(--text-tertiary);">Ошибка загрузки фонов</div>';
+    }
+}
+
+async function selectBackground(id) {
+    if (getActiveBackgroundId() === id) {
+        // Deselect if already active
+        setActiveBackgroundId(null);
+        broadcastBackground(null);
+    } else {
+        // Select new
+        setActiveBackgroundId(id);
+        const bgs = await loadBackgrounds();
+        const activeBg = bgs.find(b => b.id === id);
+        if (activeBg) {
+            broadcastBackground(activeBg.dataUrl);
+        }
+    }
+    await renderBackgroundList();
+}
+
+function broadcastBackground(dataUrl) {
+    sendToDisplay('SET_BACKGROUND', { dataUrl: dataUrl });
+}
+
+// Background File Upload Logic
+function handleBgFiles(filesArray) {
+    const validExts = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tiff', 'tif'];
+    const validFiles = filesArray.filter(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+        return validExts.includes(ext) || file.type.startsWith('image/');
+    });
+
+    if (validFiles.length === 0) {
+        alert('Пожалуйста, выберите изображения (JPG, PNG, WebP, TIFF)');
+        return;
+    }
+
+    updateStatus(elements.status, `Загрузка фонов (${validFiles.length})...`, 'info');
+
+    let processed = 0;
+
+    validFiles.forEach(async (file) => {
+        try {
+            await saveBackground(file);
+        } catch (e) {
+            console.error('Error saving background:', e);
+        } finally {
+            processed++;
+            if (processed === validFiles.length) {
+                updateStatus(elements.status, 'Фоны успешно загружены', 'success');
+                if (state.currentMode === 'backgrounds') {
+                    renderBackgroundList();
+                }
+            }
+        }
+    });
+}
+
+// Setup background drag & drop
+elements.bgDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    elements.bgDropZone.classList.add('dragover');
+});
+elements.bgDropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    elements.bgDropZone.classList.remove('dragover');
+});
+elements.bgDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    elements.bgDropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+        handleBgFiles(Array.from(e.dataTransfer.files));
+    }
+});
+elements.bgFileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) {
+        handleBgFiles(Array.from(e.target.files));
+    }
+    e.target.value = ''; // Reset
+});
+
+// === GLOBAL HELPERS ===
+
+
 // === START ===
+async function restorePresentationFromTrash(id) {
+    if (await restorePresentation(id)) {
+        await renderPresentationList();
+    }
+};
+
+async function hardDeletePresentationFromTrash(id) {
+    if (await hardDeletePresentation(id)) {
+        await renderPresentationList();
+    }
+};
+
 window.addEventListener('load', init);
+
+// === GLOBAL EVENT DELEGATION ROUTER ===
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    // Ignore clicks that are handled inside other modals if we have complex structures,
+    // but typically tracking data-action is sufficient to isolate standard actions.
+    const action = btn.dataset.action;
+    const argsStr = btn.dataset.args;
+    const args = argsStr ? argsStr.split(',') : [];
+
+    // Map actions to functions
+    const actionMap = {
+        clearHistory,
+        toggleSettings,
+        openDisplayWindow: launchDisplayWindow,
+        switchMode,
+        openTextSearch,
+        openBibleNavModal,
+        toggleEditMode,
+        saveEdit: saveVerseEdit,
+        cancelEdit,
+        showNote: () => broadcastNote(),
+        broadcastToDisplay,
+        goToPrevVerse,
+        goToNextVerse,
+        hideFromDisplay,
+        openAddSongModal,
+        editCurrentSong,
+        broadcastSong,
+        goToPrevStanza,
+        goToNextStanza,
+        openCreatePresentationModal,
+        deleteCurrentPresentation,
+        broadcastSlide,
+        goToPrevSlide,
+        goToNextSlide,
+        closeSlidesModal: closePresentationModal,
+        bibleNavGoBack,
+        closeBibleNavModal,
+        closeTextSearch,
+        insertSongTag,
+        closeSongModal,
+        saveSongForm,
+        closePresentationModal,
+        savePresentationForm,
+        skipLoading: () => {
+            if (window.finalizeInit) window.finalizeInit(); else { document.getElementById('loading').style.display = 'none'; }
+        }
+    };
+
+    if (actionMap[action]) {
+        // We handle some imported functions directly if they collide or need wrapper
+        actionMap[action](...args);
+    } else {
+        console.warn('Click action not mapped:', action);
+    }
+});
